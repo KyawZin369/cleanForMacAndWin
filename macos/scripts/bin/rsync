@@ -1,0 +1,3 @@
+#!/bin/sh
+# Prefer system rsync; exclude AppleDouble files that break codesign on ExFAT volumes.
+exec /usr/bin/rsync --exclude='._*' "$@"
