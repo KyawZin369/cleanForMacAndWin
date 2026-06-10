@@ -109,6 +109,7 @@ class _InstallBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final waiting = controller.phase == MoleCliGatePhase.waitingForInstall;
     final hasBrew = controller.homebrewInstalled;
+    final hasBundled = controller.bundledRuntimeAvailable;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -120,10 +121,10 @@ class _InstallBody extends StatelessWidget {
           color: Color(0xFF007AFF),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'Install Mole CLI',
+        Text(
+          hasBundled ? 'Install Mole CLI' : 'Mole Runtime Missing',
           textAlign: TextAlign.center,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 24,
             fontWeight: FontWeight.w600,
             letterSpacing: -0.5,
@@ -132,9 +133,11 @@ class _InstallBody extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          hasBrew
-              ? 'This app needs the Mole command-line tool (`mo`) to clean, optimize, and monitor your Mac. Install it once with Homebrew, then you can use every feature in this app.'
-              : 'Homebrew was not found on this Mac. Install Homebrew first, then install the Mole CLI.',
+          hasBundled
+              ? (hasBrew
+                  ? 'A system Mole install was not found. You can install it with Homebrew as a fallback, or rebuild this app to restore the bundled runtime.'
+                  : 'A system Mole install was not found. Rebuild this app to restore the bundled runtime, or install Homebrew and Mole as a fallback.')
+              : 'The bundled Mole runtime is missing from this app. Rebuild from source so the CLI is copied into the app bundle.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 14,
@@ -143,7 +146,10 @@ class _InstallBody extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        if (hasBrew) ...[
+        if (!hasBundled) ...[
+          const _CommandBlock(command: './scripts/release_macos.sh'),
+          const SizedBox(height: 20),
+        ] else if (hasBrew) ...[
           _CommandBlock(command: controller.brewInstallCommand),
           const SizedBox(height: 20),
         ] else ...[

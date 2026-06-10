@@ -97,10 +97,11 @@ class MoleCliPassword {
   }
 
   static Future<bool> authenticateSudo(String password) async {
+    final environment = await MoleCliLocator.macProcessEnvironment();
     final process = await io.Process.start(
       'sudo',
       ['-S', '-p', '', '-v'],
-      environment: MoleCliLocator.macProcessEnvironment(),
+      environment: environment,
     );
     process.stdin.write('$password\n');
     await process.stdin.close();

@@ -30,12 +30,13 @@ class MoleCliRunner {
     bool logOutput = true,
   }) async {
     final executable = await MoleCliLocator.resolveExecutable();
+    final environment = await _processEnvironment();
     _logCommand(executable, args);
 
     final result = await io.Process.run(
       executable,
       args,
-      environment: _processEnvironment,
+      environment: environment,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,
       runInShell: currentPlatform == AppPlatform.windows,
@@ -71,12 +72,13 @@ class MoleCliRunner {
     }
 
     final executable = await MoleCliLocator.resolveExecutable();
+    final environment = await _processEnvironment();
     _logCommand(executable, args);
 
     final process = await io.Process.start(
       executable,
       args,
-      environment: _processEnvironment,
+      environment: environment,
       runInShell: currentPlatform == AppPlatform.windows,
     );
     _activeProcess = process;
@@ -215,10 +217,10 @@ class MoleCliRunner {
     _activeProcess = null;
   }
 
-  Map<String, String>? get _processEnvironment => switch (currentPlatform) {
+  Future<Map<String, String>?> _processEnvironment() => switch (currentPlatform) {
         AppPlatform.mac => MoleCliLocator.macProcessEnvironment(),
-        AppPlatform.windows => null,
-        AppPlatform.unsupported => null,
+        AppPlatform.windows => Future.value(null),
+        AppPlatform.unsupported => Future.value(null),
       };
 
   void _logCommand(String executable, List<String> args) {

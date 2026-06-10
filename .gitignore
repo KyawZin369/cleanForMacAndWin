@@ -47,3 +47,9 @@ app.*.map.json
 *.txt
 
 *._*
+
+# Mole Go binaries built locally (downloaded or compiled)
+vendor/Mole/bin/analyze-go
+vendor/Mole/bin/status-go
+vendor/Mole/bin/analyze-darwin-*
+vendor/Mole/bin/status-darwin-*

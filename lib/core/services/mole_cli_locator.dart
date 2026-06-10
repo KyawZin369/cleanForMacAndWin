@@ -11,11 +11,14 @@ class MoleCliNotFoundException implements Exception {
   String toString() => message;
 }
 
-/// Resolves the Mole CLI binary across common macOS install locations.
+/// Resolves the Mole CLI binary, preferring the copy bundled inside the app.
 class MoleCliLocator {
   MoleCliLocator._();
 
   static String? _cachedMacPath;
+  static String? _cachedMacRoot;
+
+  static const bundledRelativePath = 'Resources/mole/mo';
 
   static const macInstallCandidates = [
     '/opt/homebrew/bin/mo',
@@ -25,10 +28,11 @@ class MoleCliLocator {
   static const brewInstallCommand = 'brew install mole';
 
   static const installHint =
-      'Install Mole with Homebrew: $brewInstallCommand';
+      'Rebuild the app to restore the bundled Mole runtime.';
 
   static void clearCache() {
     _cachedMacPath = null;
+    _cachedMacRoot = null;
   }
 
   static Future<String> resolveExecutable() async {
@@ -52,6 +56,12 @@ class MoleCliLocator {
     };
   }
 
+  static Future<bool> isBundledRuntimeAvailable() async {
+    if (currentPlatform != AppPlatform.mac) return false;
+    final bundled = await _resolveBundledExecutable();
+    return bundled != null;
+  }
+
   static Future<bool> isHomebrewInstalled() async {
     if (currentPlatform != AppPlatform.mac) return false;
 
@@ -70,10 +80,31 @@ class MoleCliLocator {
     return path.isNotEmpty && await File(path).exists();
   }
 
+  static Future<String?> bundledMoleRoot() async {
+    final cached = _cachedMacRoot;
+    if (cached != null && await Directory(cached).exists()) {
+      return cached;
+    }
+
+    final executable = await _resolveBundledExecutable();
+    if (executable == null) return null;
+
+    final root = File(executable).parent.path;
+    _cachedMacRoot = root;
+    return root;
+  }
+
   static Future<String> _resolveMacExecutable({bool throwIfMissing = true}) async {
     final cached = _cachedMacPath;
     if (cached != null && await File(cached).exists()) {
       return cached;
+    }
+
+    final bundled = await _resolveBundledExecutable();
+    if (bundled != null) {
+      _cachedMacPath = bundled;
+      _cachedMacRoot = File(bundled).parent.path;
+      return bundled;
     }
 
     for (final path in macInstallCandidates) {
@@ -103,8 +134,28 @@ class MoleCliLocator {
     return '';
   }
 
-  /// GUI apps often launch with a minimal PATH; ensure Homebrew dirs are present.
-  static Map<String, String> macProcessEnvironment() {
+  static Future<String?> _resolveBundledExecutable() async {
+    final executable = Platform.resolvedExecutable;
+    final bundleMo = File(
+      '${File(executable).parent.parent.path}/$bundledRelativePath',
+    );
+    if (await bundleMo.exists()) {
+      return bundleMo.path;
+    }
+
+    final vendorRoot = Platform.environment['MOLE_VENDOR_ROOT'];
+    if (vendorRoot != null && vendorRoot.isNotEmpty) {
+      final vendorMo = File('$vendorRoot/mo');
+      if (await vendorMo.exists()) {
+        return vendorMo.path;
+      }
+    }
+
+    return null;
+  }
+
+  /// GUI apps often launch with a minimal PATH; ensure tool dirs are present.
+  static Future<Map<String, String>> macProcessEnvironment() async {
     final env = Map<String, String>.from(Platform.environment);
     const pathPrefixes = [
       '/opt/homebrew/bin',
@@ -119,6 +170,15 @@ class MoleCliLocator {
         .split(':')
         .where((part) => part.isNotEmpty)
         .toList();
+
+    final moleRoot = await bundledMoleRoot();
+    if (moleRoot != null) {
+      final moleBin = '$moleRoot/bin';
+      if (!parts.contains(moleBin)) {
+        parts.insert(0, moleBin);
+      }
+      env['MOLE_VENDOR_ROOT'] = moleRoot;
+    }
 
     for (final prefix in pathPrefixes.reversed) {
       if (!parts.contains(prefix)) {

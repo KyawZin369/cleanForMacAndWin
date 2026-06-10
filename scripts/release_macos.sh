@@ -5,8 +5,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 "$ROOT/scripts/setup_macos_build.sh"
+"$ROOT/scripts/build_mole.sh"
 
 export COPYFILE_DISABLE=1
+export MOLE_VENDOR_ROOT="$ROOT/vendor/Mole"
 find "$ROOT" -name '._*' -type f -delete 2>/dev/null || true
 
 echo "Building macOS release..."
@@ -36,4 +38,4 @@ echo "  App: $APP_PATH"
 echo "  Zip: $ZIP_PATH"
 echo ""
 echo "Install: drag Khine.app to /Applications"
-echo "Requires: Homebrew + mole CLI (brew install mole)"
+echo "Includes bundled Mole CLI — no Homebrew install required."

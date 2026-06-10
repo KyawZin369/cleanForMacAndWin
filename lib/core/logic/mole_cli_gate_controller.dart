@@ -20,11 +20,13 @@ class MoleCliGateController extends ChangeNotifier {
   static const _pollInterval = Duration(seconds: 2);
 
   MoleCliGatePhase _phase = MoleCliGatePhase.checking;
+  bool _bundledRuntimeAvailable = false;
   bool _homebrewInstalled = false;
   String? _errorMessage;
   bool _pollActive = false;
 
   MoleCliGatePhase get phase => _phase;
+  bool get bundledRuntimeAvailable => _bundledRuntimeAvailable;
   bool get homebrewInstalled => _homebrewInstalled;
   String? get errorMessage => _errorMessage;
   bool get isReady => _phase == MoleCliGatePhase.ready;
@@ -36,6 +38,7 @@ class MoleCliGateController extends ChangeNotifier {
     _phase = MoleCliGatePhase.checking;
     notifyListeners();
 
+    _bundledRuntimeAvailable = await MoleCliLocator.isBundledRuntimeAvailable();
     _homebrewInstalled = await MoleCliLocator.isHomebrewInstalled();
     final moPath = await MoleCliLocator.tryResolveExecutable();
 
