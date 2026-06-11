@@ -2,13 +2,14 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:mole_ui/ui/widgets/app_logo.dart';
 
 class AestheticSpinner extends StatefulWidget {
   const AestheticSpinner({
     super.key,
     required this.isAnimating,
     this.progress = 0,
-    this.size = 200,
+    this.size = 280,
   });
 
   final bool isAnimating;
@@ -23,6 +24,8 @@ class _AestheticSpinnerState extends State<AestheticSpinner>
     with TickerProviderStateMixin {
   late final AnimationController _spinController;
   late final AnimationController _pulseController;
+  late final Animation<double> _spinAnimation;
+  late final Animation<double> _pulseAnimation;
 
   static const _gradientColors = [
     Color(0xFF5AC8FA),
@@ -37,12 +40,21 @@ class _AestheticSpinnerState extends State<AestheticSpinner>
     super.initState();
     _spinController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 3200),
     );
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 2800),
+    );
+
+    _spinAnimation = CurvedAnimation(
+      parent: _spinController,
+      curve: Curves.linear,
+    );
+    _pulseAnimation = CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeInOutSine,
+    );
 
     _syncAnimation();
   }
@@ -57,11 +69,19 @@ class _AestheticSpinnerState extends State<AestheticSpinner>
 
   void _syncAnimation() {
     if (widget.isAnimating) {
-      _spinController.repeat();
+      if (!_spinController.isAnimating) {
+        _spinController.repeat();
+      }
+      if (!_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      }
     } else {
       _spinController
         ..stop()
         ..reset();
+      if (!_pulseController.isAnimating) {
+        _pulseController.repeat(reverse: true);
+      }
     }
   }
 
@@ -75,71 +95,96 @@ class _AestheticSpinnerState extends State<AestheticSpinner>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_spinController, _pulseController]),
+      animation: Listenable.merge([_spinAnimation, _pulseAnimation]),
       builder: (context, _) {
-        final pulse = 0.92 + (_pulseController.value * 0.08);
-        final glowOpacity = widget.isAnimating ? 0.35 : 0.18;
+        final spin = _spinAnimation.value;
+        final pulse = 0.96 + (_pulseAnimation.value * 0.04);
+        final glowOpacity = widget.isAnimating ? 0.32 : 0.16;
+        final coreScale = widget.isAnimating ? (0.985 + _pulseAnimation.value * 0.03) : pulse;
+        final showProgressLabel = widget.isAnimating && widget.progress > 0;
 
-        return SizedBox(
-          width: widget.size,
-          height: widget.size,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Transform.scale(
-                scale: widget.isAnimating ? 1.0 : pulse,
-                child: Container(
-                  width: widget.size * 0.92,
-                  height: widget.size * 0.92,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF007AFF).withValues(alpha: glowOpacity),
-                        blurRadius: 48,
-                        spreadRadius: 8,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: widget.size,
+              height: widget.size,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Transform.scale(
+                    scale: widget.isAnimating ? 1.0 : pulse,
+                    child: Container(
+                      width: widget.size * 0.92,
+                      height: widget.size * 0.92,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF007AFF).withValues(alpha: glowOpacity),
+                            blurRadius: 48,
+                            spreadRadius: 8,
+                          ),
+                          BoxShadow(
+                            color: const Color(0xFFAF52DE).withValues(alpha: glowOpacity * 0.6),
+                            blurRadius: 32,
+                            spreadRadius: 2,
+                          ),
+                        ],
                       ),
-                      BoxShadow(
-                        color: const Color(0xFFAF52DE).withValues(alpha: glowOpacity * 0.6),
-                        blurRadius: 32,
-                        spreadRadius: 2,
+                    ),
+                  ),
+                  CustomPaint(
+                    size: Size.square(widget.size * 0.86),
+                    painter: _SpinnerTrackPainter(
+                      strokeWidth: widget.size * 0.028,
+                    ),
+                  ),
+                  Transform.rotate(
+                    angle: spin * 2 * math.pi,
+                    child: CustomPaint(
+                      size: Size.square(widget.size * 0.86),
+                      painter: _SpinnerArcPainter(
+                        colors: _gradientColors,
+                        strokeWidth: widget.size * 0.042,
+                        arcSweep: widget.isAnimating ? 2.8 : 1.8,
+                        opacity: widget.isAnimating ? 1.0 : 0.5,
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              Transform.rotate(
-                angle: _spinController.value * 2 * math.pi,
-                child: CustomPaint(
-                  size: Size.square(widget.size * 0.82),
-                  painter: _SpinnerArcPainter(
-                    colors: _gradientColors,
-                    strokeWidth: widget.size * 0.045,
-                    arcSweep: widget.isAnimating ? 2.4 : 1.6,
-                    opacity: widget.isAnimating ? 1.0 : 0.55,
+                  Transform.rotate(
+                    angle: -spin * 2 * math.pi * 0.55,
+                    child: CustomPaint(
+                      size: Size.square(widget.size * 0.68),
+                      painter: _SpinnerArcPainter(
+                        colors: _gradientColors.reversed.toList(),
+                        strokeWidth: widget.size * 0.03,
+                        arcSweep: widget.isAnimating ? 2.2 : 1.4,
+                        opacity: widget.isAnimating ? 0.7 : 0.32,
+                        startOffset: math.pi / 4,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Transform.rotate(
-                angle: -_spinController.value * 2 * math.pi * 0.7,
-                child: CustomPaint(
-                  size: Size.square(widget.size * 0.62),
-                  painter: _SpinnerArcPainter(
-                    colors: _gradientColors.reversed.toList(),
-                    strokeWidth: widget.size * 0.032,
-                    arcSweep: widget.isAnimating ? 1.8 : 1.2,
-                    opacity: widget.isAnimating ? 0.75 : 0.35,
-                    startOffset: math.pi / 3,
+                  Transform.scale(
+                    scale: coreScale,
+                    child: _GlassCore(size: widget.size * 0.62),
                   ),
-                ),
+                ],
               ),
-              _GlassCore(
-                size: widget.size * 0.48,
-                isAnimating: widget.isAnimating,
-                progress: widget.progress,
+            ),
+            if (showProgressLabel) ...[
+              SizedBox(height: widget.size * 0.08),
+              Text(
+                '${(widget.progress * 100).round()}%',
+                style: TextStyle(
+                  fontSize: widget.size * 0.11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.5,
+                  color: const Color(0xFF1C1C1E).withValues(alpha: 0.72),
+                ),
               ),
             ],
-          ),
+          ],
         );
       },
     );
@@ -147,21 +192,15 @@ class _AestheticSpinnerState extends State<AestheticSpinner>
 }
 
 class _GlassCore extends StatelessWidget {
-  const _GlassCore({
-    required this.size,
-    required this.isAnimating,
-    required this.progress,
-  });
+  const _GlassCore({required this.size});
 
   final double size;
-  final bool isAnimating;
-  final double progress;
 
   @override
   Widget build(BuildContext context) {
     return ClipOval(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
         child: Container(
           width: size,
           height: size,
@@ -171,12 +210,12 @@ class _GlassCore extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withValues(alpha: 0.75),
-                Colors.white.withValues(alpha: 0.35),
+                Colors.white.withValues(alpha: 0.78),
+                Colors.white.withValues(alpha: 0.38),
               ],
             ),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.6),
+              color: Colors.white.withValues(alpha: 0.65),
               width: 1.5,
             ),
             boxShadow: [
@@ -188,25 +227,39 @@ class _GlassCore extends StatelessWidget {
             ],
           ),
           child: Center(
-            child: isAnimating
-                ? Text(
-                    '${(progress * 100).round()}%',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.5,
-                      color: Color(0xFF1C1C1E),
-                    ),
-                  )
-                : Icon(
-                    Icons.auto_awesome_rounded,
-                    size: size * 0.32,
-                    color: const Color(0xFF007AFF).withValues(alpha: 0.85),
-                  ),
+            child: AppLogo(
+              size: size * 0.82,
+              showShadow: false,
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+class _SpinnerTrackPainter extends CustomPainter {
+  _SpinnerTrackPainter({required this.strokeWidth});
+
+  final double strokeWidth;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
+
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SpinnerTrackPainter oldDelegate) {
+    return oldDelegate.strokeWidth != strokeWidth;
   }
 }
 
@@ -230,14 +283,6 @@ class _SpinnerArcPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
     final rect = Rect.fromCircle(center: center, radius: radius);
-
-    final backgroundPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, backgroundPaint);
 
     final sweepPaint = Paint()
       ..shader = SweepGradient(

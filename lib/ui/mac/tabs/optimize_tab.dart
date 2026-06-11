@@ -30,7 +30,7 @@ class OptimizeTab extends StatelessWidget {
                   AestheticSpinner(
                     isAnimating: isOptimizing || awaitingPassword,
                     progress: progress,
-                    size: 220,
+                    size: 300,
                   ),
                   const SizedBox(height: 48),
                   if (isOptimizing || awaitingPassword) ...[

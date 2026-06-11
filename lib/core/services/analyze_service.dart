@@ -1,7 +1,7 @@
 import 'dart:convert';
-import 'dart:io' as io;
 
 import 'package:mole_ui/core/models/analyze_snapshot.dart';
+import 'package:mole_ui/core/platform/platform_shell.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
 class AnalyzeService {
@@ -29,21 +29,9 @@ class AnalyzeService {
     return AnalyzeSnapshot.fromJson(decoded);
   }
 
-  Future<int?> fetchFreeBytes() async {
-    final result = await io.Process.run('df', ['-k', '/']);
-    final lines = (result.stdout as String? ?? '').split('\n');
-    if (lines.length < 2) return null;
+  Future<int?> fetchFreeBytes() => PlatformShell.fetchFreeBytes();
 
-    final parts = lines[1].trim().split(RegExp(r'\s+'));
-    if (parts.length < 4) return null;
-
-    final availableKb = int.tryParse(parts[3]);
-    return availableKb != null ? availableKb * 1024 : null;
-  }
-
-  Future<void> openInFinder(String path) async {
-    await io.Process.run('open', [path]);
-  }
+  Future<void> openInFinder(String path) => PlatformShell.revealInFileManager(path);
 
   String _extractJsonObject(String output) {
     final start = output.indexOf('{');

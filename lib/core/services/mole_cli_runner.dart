@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 
-import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/mole_cli_locator.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 
@@ -29,17 +28,16 @@ class MoleCliRunner {
     List<String> args, {
     bool logOutput = true,
   }) async {
-    final executable = await MoleCliLocator.resolveExecutable();
-    final environment = await _processEnvironment();
-    _logCommand(executable, args);
+    final launch = await MoleCliLocator.buildLaunchSpec(args);
+    _logCommand(launch.executable, launch.args);
 
     final result = await io.Process.run(
-      executable,
-      args,
-      environment: environment,
+      launch.executable,
+      launch.args,
+      environment: launch.environment,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,
-      runInShell: currentPlatform == AppPlatform.windows,
+      runInShell: launch.runInShell,
     );
 
     final stdoutText = result.stdout as String? ?? '';
@@ -71,15 +69,14 @@ class MoleCliRunner {
       throw StateError('A Mole CLI command is already running.');
     }
 
-    final executable = await MoleCliLocator.resolveExecutable();
-    final environment = await _processEnvironment();
-    _logCommand(executable, args);
+    final launch = await MoleCliLocator.buildLaunchSpec(args);
+    _logCommand(launch.executable, launch.args);
 
     final process = await io.Process.start(
-      executable,
-      args,
-      environment: environment,
-      runInShell: currentPlatform == AppPlatform.windows,
+      launch.executable,
+      launch.args,
+      environment: launch.environment,
+      runInShell: launch.runInShell,
     );
     _activeProcess = process;
 
@@ -216,12 +213,6 @@ class MoleCliRunner {
     process.kill();
     _activeProcess = null;
   }
-
-  Future<Map<String, String>?> _processEnvironment() => switch (currentPlatform) {
-        AppPlatform.mac => MoleCliLocator.macProcessEnvironment(),
-        AppPlatform.windows => Future.value(null),
-        AppPlatform.unsupported => Future.value(null),
-      };
 
   void _logCommand(String executable, List<String> args) {
     io.stdout.writeln('[mole_ui] > $executable ${args.join(' ')}');

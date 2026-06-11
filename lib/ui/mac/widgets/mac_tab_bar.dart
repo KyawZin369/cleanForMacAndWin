@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:mole_ui/ui/widgets/app_logo.dart';
 
 enum MacHomeTab {
   clean('Clean'),
@@ -120,13 +121,16 @@ class _MacTabBarState extends State<MacTabBar> {
                     indicatorWidth: _indicatorWidth,
                     indicatorReady: _indicatorReady,
                     children: [
-                      for (var i = 0; i < MacHomeTab.values.length; i++)
+                      for (var i = 0; i < MacHomeTab.values.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
                         _GlassTabItem(
                           key: _tabKeys[i],
                           label: MacHomeTab.values[i].label,
                           selected: MacHomeTab.values[i] == widget.selectedTab,
                           onTap: () => widget.onTabSelected(MacHomeTab.values[i]),
                         ),
+                      ],
+                      const SizedBox(width: 16),
                     ],
                   ),
                 ),
@@ -234,30 +238,7 @@ class _GlassLogo extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF5AC8FA), Color(0xFF5856D6)],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF007AFF).withValues(alpha: 0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.bolt_rounded,
-            size: 16,
-            color: Colors.white,
-          ),
-        ),
+        const AppLogo(size: 40),
         const SizedBox(width: 10),
         const Text(
           'Khine',

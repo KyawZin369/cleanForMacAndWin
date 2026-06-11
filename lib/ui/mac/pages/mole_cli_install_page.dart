@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mole_ui/core/logic/mole_cli_gate_controller.dart';
 import 'package:mole_ui/ui/mac/widgets/glass_action_widgets.dart';
+import 'package:mole_ui/ui/widgets/app_logo.dart';
 
 class MoleCliInstallPage extends StatelessWidget {
   const MoleCliInstallPage({super.key, required this.controller});
@@ -85,6 +86,8 @@ class _CheckingBody extends StatelessWidget {
     return const Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        AppLogo(size: 56, showShadow: false),
+        SizedBox(height: 20),
         CircularProgressIndicator(strokeWidth: 2.5),
         SizedBox(height: 20),
         Text(
@@ -115,11 +118,7 @@ class _InstallBody extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(
-          Icons.terminal_rounded,
-          size: 44,
-          color: Color(0xFF007AFF),
-        ),
+        const Center(child: AppLogo(size: 56, showShadow: false)),
         const SizedBox(height: 16),
         Text(
           hasBundled ? 'Install Mole CLI' : 'Mole Runtime Missing',

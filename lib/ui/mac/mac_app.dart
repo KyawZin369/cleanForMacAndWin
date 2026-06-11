@@ -7,6 +7,7 @@ import 'package:mole_ui/core/logic/status_controller.dart';
 import 'package:mole_ui/core/logic/uninstall_controller.dart';
 import 'package:mole_ui/ui/mac/mac_home_page.dart';
 import 'package:mole_ui/ui/mac/pages/mole_cli_install_page.dart';
+import 'package:mole_ui/ui/widgets/app_splash_screen.dart';
 
 class MacApp extends StatefulWidget {
   const MacApp({
@@ -30,14 +31,14 @@ class MacApp extends StatefulWidget {
 
 class _MacAppState extends State<MacApp> {
   late final MoleCliGateController _gateController;
+  late final Future<void> _startupFuture;
+  bool _splashComplete = false;
 
   @override
   void initState() {
     super.initState();
     _gateController = MoleCliGateController();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _gateController.check();
-    });
+    _startupFuture = _gateController.check();
   }
 
   @override
@@ -60,22 +61,35 @@ class _MacAppState extends State<MacApp> {
         ),
         scaffoldBackgroundColor: const Color(0xFFF5F5F7),
       ),
-      home: AnimatedBuilder(
-        animation: _gateController,
-        builder: (context, _) {
-          if (_gateController.isReady) {
-            return MacHomePage(
-              cleanController: widget.cleanController,
-              uninstallController: widget.uninstallController,
-              optimizeController: widget.optimizeController,
-              analyzeController: widget.analyzeController,
-              statusController: widget.statusController,
-            );
-          }
+      home: _splashComplete ? _buildMainContent() : _buildSplash(),
+    );
+  }
 
-          return MoleCliInstallPage(controller: _gateController);
-        },
-      ),
+  Widget _buildSplash() {
+    return AppSplashScreen(
+      waitFor: _startupFuture,
+      onFinished: () {
+        if (mounted) setState(() => _splashComplete = true);
+      },
+    );
+  }
+
+  Widget _buildMainContent() {
+    return AnimatedBuilder(
+      animation: _gateController,
+      builder: (context, _) {
+        if (_gateController.isReady) {
+          return MacHomePage(
+            cleanController: widget.cleanController,
+            uninstallController: widget.uninstallController,
+            optimizeController: widget.optimizeController,
+            analyzeController: widget.analyzeController,
+            statusController: widget.statusController,
+          );
+        }
+
+        return MoleCliInstallPage(controller: _gateController);
+      },
     );
   }
 }

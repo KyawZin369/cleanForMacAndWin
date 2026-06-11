@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "mole_ui" "\0"
+            VALUE "CompanyName", "Khine" "\0"
+            VALUE "FileDescription", "Khine" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "mole_ui" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "mole_ui.exe" "\0"
-            VALUE "ProductName", "mole_ui" "\0"
+            VALUE "InternalName", "Khine" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Khine. All rights reserved." "\0"
+            VALUE "OriginalFilename", "Khine.exe" "\0"
+            VALUE "ProductName", "Khine" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

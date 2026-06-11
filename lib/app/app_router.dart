@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mole_ui/core/logic/analyze_controller.dart';
 import 'package:mole_ui/core/logic/clean_controller.dart';
-import 'package:mole_ui/core/logic/home_controller.dart';
 import 'package:mole_ui/core/logic/optimize_controller.dart';
 import 'package:mole_ui/core/logic/status_controller.dart';
 import 'package:mole_ui/core/logic/uninstall_controller.dart';
@@ -13,7 +12,6 @@ import 'package:mole_ui/ui/windows/windows_app.dart';
 class AppRouter extends StatelessWidget {
   const AppRouter({
     super.key,
-    required this.homeController,
     required this.cleanController,
     required this.uninstallController,
     required this.optimizeController,
@@ -21,7 +19,6 @@ class AppRouter extends StatelessWidget {
     required this.statusController,
   });
 
-  final HomeController homeController;
   final CleanController cleanController;
   final UninstallController uninstallController;
   final OptimizeController optimizeController;
@@ -40,7 +37,12 @@ class AppRouter extends StatelessWidget {
           statusController: statusController,
         );
       case AppPlatform.windows:
-        return WindowsApp(controller: homeController);
+        return WindowsApp(
+          cleanController: cleanController,
+          uninstallController: uninstallController,
+          analyzeController: analyzeController,
+          statusController: statusController,
+        );
       case AppPlatform.unsupported:
         return const MaterialApp(
           home: Scaffold(

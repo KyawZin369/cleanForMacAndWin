@@ -29,7 +29,7 @@ class CleanTab extends StatelessWidget {
                   AestheticSpinner(
                     isAnimating: isCleaning,
                     progress: progress,
-                    size: 220,
+                    size: 300,
                   ),
                   const SizedBox(height: 48),
                   if (isCleaning) ...[

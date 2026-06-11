@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:mole_ui/core/models/analyze_snapshot.dart';
+import 'package:mole_ui/core/platform/platform_shell.dart';
 import 'package:mole_ui/core/services/analyze_service.dart';
 
 class AnalyzeController extends ChangeNotifier {
@@ -20,14 +21,24 @@ class AnalyzeController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get canGoBack => _currentPath != null;
 
-  String get currentPath => _snapshot?.path ?? '/';
+  String get currentPath => _snapshot?.path ?? _defaultRootPath;
+
+  String get _defaultRootPath => PlatformShell.analyzeRootLabel == 'This PC'
+      ? r'C:\'
+      : '/';
+
+  String get revealLabel => PlatformShell.revealInExplorerLabel;
 
   List<String> get breadcrumbSegments {
     final path = currentPath;
-    if (path == '/') return ['Macintosh HD'];
+    final root = PlatformShell.analyzeRootLabel;
 
-    final segments = <String>['Macintosh HD'];
-    segments.addAll(path.split('/').where((part) => part.isNotEmpty));
+    if (path == '/' || path == r'C:\' || path == r'C:') {
+      return [root];
+    }
+
+    final segments = <String>[root];
+    segments.addAll(PlatformShell.pathSegments(path));
     return segments;
   }
 
@@ -61,7 +72,7 @@ class AnalyzeController extends ChangeNotifier {
 
   Future<void> goBack() async {
     if (_currentPath == null || _isLoading) return;
-    _currentPath = _parentPath(_currentPath!);
+    _currentPath = PlatformShell.parentPath(_currentPath!);
     await refresh();
   }
 
@@ -71,9 +82,7 @@ class AnalyzeController extends ChangeNotifier {
     if (index == 0) {
       _currentPath = null;
     } else {
-      final segments = breadcrumbSegments;
-      if (index >= segments.length) return;
-      _currentPath = '/${segments.sublist(1, index + 1).join('/')}';
+      _currentPath = PlatformShell.breadcrumbPath(breadcrumbSegments, index);
     }
     await refresh();
   }
@@ -82,14 +91,5 @@ class AnalyzeController extends ChangeNotifier {
     final target = path ?? currentPath;
     if (target.isEmpty) return;
     await _service.openInFinder(target);
-  }
-
-  String? _parentPath(String path) {
-    final normalized = path.replaceAll(RegExp(r'/+$'), '');
-    if (normalized.isEmpty || normalized == '/') return null;
-
-    final index = normalized.lastIndexOf('/');
-    if (index <= 0) return null;
-    return normalized.substring(0, index);
   }
 }
