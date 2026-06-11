@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:mole_ui/core/platform/cli_commands.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
@@ -39,7 +40,7 @@ class CleanCommandRunner {
     MolePasswordPromptCallback? onPasswordPrompt,
   }) async {
     final result = await _cli.runStreaming(
-      const ['clean'],
+      cleanCommandArgs(),
       onOutput: onOutput,
       onPasswordPrompt: onPasswordPrompt,
     );

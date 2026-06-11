@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:mole_ui/core/models/uninstall_app.dart';
+import 'package:mole_ui/core/platform/cli_commands.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
@@ -11,7 +12,7 @@ class UninstallService {
 
   Future<List<UninstallApp>> fetchApps() async {
     final result = await _cli.runCapture(
-      ['uninstall', '--list'],
+      uninstallListArgs(),
       logOutput: false,
     );
     if (!result.success) {
@@ -41,7 +42,7 @@ class UninstallService {
     }
 
     return _cli.runStreaming(
-      ['uninstall', ...uninstallNames],
+      uninstallAppsArgs(uninstallNames),
       onOutput: onOutput,
       onPasswordPrompt: onPasswordPrompt,
       autoConfirmUninstall: true,

@@ -24,17 +24,37 @@ class MoleCliRunner {
 
   bool get isRunning => _activeProcess != null;
 
+  Future<MoleCliResult> runKhineScriptCapture(
+    String scriptRelative,
+    List<String> args, {
+    bool logOutput = true,
+  }) async {
+    final launch = await MoleCliLocator.buildKhineScriptLaunchSpec(
+      scriptRelative,
+      args,
+    );
+    return _runCaptureLaunch(launch, logOutput: logOutput);
+  }
+
   Future<MoleCliResult> runCapture(
     List<String> args, {
     bool logOutput = true,
   }) async {
     final launch = await MoleCliLocator.buildLaunchSpec(args);
+    return _runCaptureLaunch(launch, logOutput: logOutput);
+  }
+
+  Future<MoleCliResult> _runCaptureLaunch(
+    CliLaunchSpec launch, {
+    required bool logOutput,
+  }) async {
     _logCommand(launch.executable, launch.args);
 
     final result = await io.Process.run(
       launch.executable,
       launch.args,
       environment: launch.environment,
+      workingDirectory: launch.workingDirectory,
       stdoutEncoding: utf8,
       stderrEncoding: utf8,
       runInShell: launch.runInShell,
@@ -76,6 +96,7 @@ class MoleCliRunner {
       launch.executable,
       launch.args,
       environment: launch.environment,
+      workingDirectory: launch.workingDirectory,
       runInShell: launch.runInShell,
     );
     _activeProcess = process;

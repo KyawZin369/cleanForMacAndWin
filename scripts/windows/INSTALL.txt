@@ -6,9 +6,16 @@ Requirements
 - Windows 10 or Windows 11 (64-bit)
 - PowerShell 5.1 or newer (included with Windows)
 
-Install
--------
-1. Extract this zip to a folder, for example:
+Recommended install (setup.exe)
+-------------------------------
+1. Double-click Khine-<version>-windows-setup.exe
+2. Follow the installer wizard
+3. Khine is installed to Program Files and added to the Start menu
+4. Optional: choose a desktop shortcut during setup
+
+Portable install (zip)
+----------------------
+1. Extract Khine-<version>-windows.zip to a folder, for example:
    C:\Program Files\Khine
 2. Double-click Khine.exe to launch the app.
 3. Optional: pin Khine.exe to Start or the taskbar.

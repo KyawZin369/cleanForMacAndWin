@@ -1,0 +1,38 @@
+name: Release macOS
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Python dependencies
+        run: python3 -m pip install pillow
+
+      - name: Vendor Mole
+        run: sh scripts/setup_macos_build.sh
+
+      - name: Build macOS release installers
+        run: sh scripts/release_macos.sh
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: khine-macos
+          path: |
+            dist/macos/*.dmg
+            dist/macos/*.pkg
+            dist/macos/*.zip

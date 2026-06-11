@@ -18,6 +18,7 @@ class MoleCliLocator {
   static String? _cachedMacPath;
   static String? _cachedMacRoot;
   static String? _cachedWindowsScript;
+  static String? _cachedWindowsShell;
 
   static const macBundledRelativePath = 'Resources/mole/mo';
   static const windowsBundledRelativePath = 'winmole/winmole.ps1';
@@ -47,6 +48,7 @@ class MoleCliLocator {
     _cachedMacPath = null;
     _cachedMacRoot = null;
     _cachedWindowsScript = null;
+    _cachedWindowsShell = null;
   }
 
   static Future<String> resolveExecutable() async {
@@ -132,8 +134,9 @@ class MoleCliLocator {
         ),
       AppPlatform.windows => () async {
           final script = await resolveExecutable();
+          final root = await _bundledWindowsRoot();
           return CliLaunchSpec(
-            executable: 'powershell.exe',
+            executable: await _resolveWindowsShell(),
             args: [
               '-NoProfile',
               '-ExecutionPolicy',
@@ -143,6 +146,7 @@ class MoleCliLocator {
               ...args,
             ],
             environment: await windowsProcessEnvironment(),
+            workingDirectory: root,
             runInShell: false,
           );
         }(),
@@ -150,6 +154,39 @@ class MoleCliLocator {
           'CLI is only supported on macOS and Windows.',
         ),
     };
+  }
+
+  /// Runs a WinMole helper script bundled under `bin/khine/`.
+  static Future<CliLaunchSpec> buildKhineScriptLaunchSpec(
+    String scriptRelative,
+    List<String> args,
+  ) async {
+    if (currentPlatform != AppPlatform.windows) {
+      throw UnsupportedError('Khine scripts are only available on Windows.');
+    }
+
+    final root = await _requireWindowsRoot();
+    final script = _joinWindowsPath(root, scriptRelative);
+    if (!await File(script).exists()) {
+      throw MoleCliNotFoundException(
+        'WinMole helper script not found: $scriptRelative. $windowsInstallHint',
+      );
+    }
+
+    return CliLaunchSpec(
+      executable: await _resolveWindowsShell(),
+      args: [
+        '-NoProfile',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        script,
+        ...args,
+      ],
+      environment: await windowsProcessEnvironment(),
+      workingDirectory: root,
+      runInShell: false,
+    );
   }
 
   static Future<String?> _bundledMacRoot() async {
@@ -167,9 +204,73 @@ class MoleCliLocator {
   }
 
   static Future<String?> _bundledWindowsRoot() async {
-    final script = await _resolveBundledWindowsScript();
+    final cachedScript = _cachedWindowsScript;
+    if (cachedScript != null) {
+      final root = File(cachedScript).parent.path;
+      if (await Directory(root).exists()) {
+        return root;
+      }
+    }
+
+    final script = await _resolveBundledWindowsScript() ??
+        await _resolveVendorWindowsScript() ??
+        await _resolveWindowsScriptFromPath();
     if (script == null) return null;
     return File(script).parent.path;
+  }
+
+  static Future<String> _requireWindowsRoot() async {
+    final root = await _bundledWindowsRoot();
+    if (root != null && await Directory(root).exists()) {
+      return root;
+    }
+    throw MoleCliNotFoundException(
+      'WinMole root was not found. $windowsInstallHint',
+    );
+  }
+
+  static Future<String> _resolveWindowsShell() async {
+    final cached = _cachedWindowsShell;
+    if (cached != null) return cached;
+
+    const pwshCandidates = [
+      r'C:\Program Files\PowerShell\7\pwsh.exe',
+      r'C:\Program Files (x86)\PowerShell\7\pwsh.exe',
+    ];
+
+    for (final candidate in pwshCandidates) {
+      if (await File(candidate).exists()) {
+        _cachedWindowsShell = candidate;
+        return candidate;
+      }
+    }
+
+    final result = await Process.run(
+      'where',
+      ['pwsh'],
+      runInShell: true,
+    );
+    if (result.exitCode == 0) {
+      final path = (result.stdout as String? ?? '')
+          .split('\n')
+          .map((line) => line.trim())
+          .firstWhere((line) => line.isNotEmpty, orElse: () => '');
+      if (path.isNotEmpty && await File(path).exists()) {
+        _cachedWindowsShell = path;
+        return path;
+      }
+    }
+
+    _cachedWindowsShell = 'powershell.exe';
+    return _cachedWindowsShell!;
+  }
+
+  static String _joinWindowsPath(String root, String relative) {
+    final normalized = relative.replaceAll('/', '\\');
+    if (normalized.contains(':')) {
+      return normalized;
+    }
+    return '$root\\$normalized';
   }
 
   static Future<String> _resolveMacExecutable({bool throwIfMissing = true}) async {
@@ -357,6 +458,7 @@ class MoleCliLocator {
     final root = await _bundledWindowsRoot();
     if (root != null) {
       env['WINMOLE_VENDOR_ROOT'] = root;
+      env['WINMOLE_ROOT'] = root;
       final binDir = '$root\\bin';
       final path = env['PATH'] ?? '';
       if (!path.toLowerCase().contains(binDir.toLowerCase())) {
@@ -373,10 +475,12 @@ class CliLaunchSpec {
     required this.args,
     required this.environment,
     required this.runInShell,
+    this.workingDirectory,
   });
 
   final String executable;
   final List<String> args;
   final Map<String, String>? environment;
   final bool runInShell;
+  final String? workingDirectory;
 }

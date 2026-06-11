@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:mole_ui/core/models/analyze_snapshot.dart';
+import 'package:mole_ui/core/platform/cli_commands.dart';
 import 'package:mole_ui/core/platform/platform_shell.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
@@ -10,12 +11,14 @@ class AnalyzeService {
   final MoleCliRunner _cli;
 
   Future<AnalyzeSnapshot> analyzePath([String? path]) async {
-    final args = <String>['analyze', '-json'];
-    if (path != null && path.isNotEmpty) {
-      args.add(path);
-    }
-
-    final result = await _cli.runCapture(args, logOutput: false);
+    final khineScript = windowsKhineScriptForAnalyze();
+    final result = khineScript == null
+        ? await _cli.runCapture(analyzeCommandArgs(path), logOutput: false)
+        : await _cli.runKhineScriptCapture(
+            khineScript,
+            analyzeCommandArgs(path),
+            logOutput: false,
+          );
     if (!result.success) {
       throw Exception(
         result.stderr.trim().isNotEmpty

@@ -1,7 +1,10 @@
-# Builds a portable Khine Windows release zip for other PCs.
+# Builds Khine Windows release artifacts:
+#   - Khine-<version>-windows-setup.exe  (recommended installer)
+#   - Khine-<version>-windows.zip        (portable)
 # Run on Windows 10/11 with Flutter + Visual Studio C++ tools installed.
 param(
-  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
+  [switch]$SkipInstaller
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,7 +15,7 @@ $VersionLine = Select-String -Path (Join-Path $ProjectRoot "pubspec.yaml") -Patt
 if (-not $VersionLine) {
   throw "Could not read version from pubspec.yaml"
 }
-$Version = $VersionLine.Matches.Groups[1].Value.Trim()
+$Version = ($VersionLine.Matches.Groups[1].Value.Trim() -split '\+')[0]
 
 function Ensure-WinMoleVendor {
   $vendor = Join-Path $ProjectRoot "vendor\WinMole"
@@ -40,6 +43,70 @@ function Remove-StaleBuildPath {
     Write-Host "Removing stale build symlink/file..."
     Remove-Item -LiteralPath $buildPath -Force -Recurse
   }
+}
+
+function Find-InnoSetupCompiler {
+  $candidates = @(
+    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+    "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+  )
+
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) {
+      return $candidate
+    }
+  }
+
+  $where = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+  if ($where) {
+    return $where.Source
+  }
+
+  return $null
+}
+
+function Build-WindowsInstaller {
+  param(
+    [string]$SourceDir,
+    [string]$DistDir,
+    [string]$AppVersion
+  )
+
+  $iss = Join-Path $ProjectRoot "scripts\windows\khine.iss"
+  if (-not (Test-Path $iss)) {
+    throw "Installer script not found: $iss"
+  }
+
+  $iscc = Find-InnoSetupCompiler
+  if (-not $iscc) {
+    Write-Warning "Inno Setup was not found. Skipping setup.exe build."
+    Write-Warning "Install Inno Setup 6, then re-run this script to create the installer."
+    return $null
+  }
+
+  $iconFile = Join-Path $ProjectRoot "windows\runner\resources\app_icon.ico"
+  if (-not (Test-Path $iconFile)) {
+    $iconFile = Join-Path $SourceDir "$AppName.exe"
+  }
+
+  Write-Host "Building Windows installer..."
+  & $iscc `
+    "/DMyAppVersion=$AppVersion" `
+    "/DSourceDir=$SourceDir" `
+    "/DOutputDir=$DistDir" `
+    "/DIconFile=$iconFile" `
+    $iss
+
+  if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup compiler failed with exit code $LASTEXITCODE"
+  }
+
+  $setupPath = Join-Path $DistDir "$AppName-$AppVersion-windows-setup.exe"
+  if (-not (Test-Path $setupPath)) {
+    throw "Installer was not created at: $setupPath"
+  }
+
+  return $setupPath
 }
 
 Write-Host "Preparing release $AppName $Version..."
@@ -71,6 +138,11 @@ if (-not (Test-Path $WinMoleScript)) {
 $DistDir = Join-Path $ProjectRoot "dist\windows"
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 
+$SetupPath = $null
+if (-not $SkipInstaller) {
+  $SetupPath = Build-WindowsInstaller -SourceDir $ReleaseDir -DistDir $DistDir -AppVersion $Version
+}
+
 $StageRoot = Join-Path $env:TEMP ("khine-win-{0}" -f [guid]::NewGuid().ToString("N"))
 $StageApp = Join-Path $StageRoot $AppName
 New-Item -ItemType Directory -Force -Path $StageApp | Out-Null
@@ -96,8 +168,17 @@ Remove-Item $StageRoot -Recurse -Force
 Write-Host ""
 Write-Host "Release build complete."
 Write-Host "  App folder: $ReleaseDir"
+if ($SetupPath) {
+  Write-Host "  Installer:  $SetupPath"
+}
 Write-Host "  Zip:        $ZipPath"
 Write-Host ""
-Write-Host "Share the zip with other Windows users."
-Write-Host "They should extract it and run $AppName.exe."
+if ($SetupPath) {
+  Write-Host "Share the setup.exe with other Windows users."
+  Write-Host "Double-click it to install Khine to Program Files."
+}
+else {
+  Write-Host "Share the zip with other Windows users."
+  Write-Host "They should extract it and run $AppName.exe."
+}
 Write-Host "Bundled WinMole is included - no separate install required."

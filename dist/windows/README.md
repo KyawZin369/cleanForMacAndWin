@@ -1,15 +1,24 @@
 # Windows release output
 
-Build on Windows:
+Build locally on Windows:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/release_windows.ps1
 ```
 
-Or trigger GitHub Actions from macOS:
+Or trigger GitHub Actions:
 
-```bash
+```sh
 gh workflow run release-windows.yml
 ```
 
-Output: `Khine-0.1.0-windows.zip` — extract on any Windows 10/11 PC and run `Khine.exe`.
+## Artifacts
+
+| File | Use |
+|------|-----|
+| `Khine-<version>-windows-setup.exe` | **Recommended.** Double-click to install Khine to Program Files with Start menu shortcuts. |
+| `Khine-<version>-windows.zip` | Portable build. Extract anywhere and run `Khine.exe`. |
+
+## First launch
+
+Windows SmartScreen may warn about an unknown publisher. Click **More info** → **Run anyway** on the first launch.

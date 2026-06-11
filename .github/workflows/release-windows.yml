@@ -25,6 +25,9 @@ jobs:
       - name: Install Pillow
         run: python -m pip install pillow
 
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
       - name: Vendor WinMole
         shell: bash
         run: sh scripts/setup_winmole_vendor.sh
@@ -36,11 +39,13 @@ jobs:
             rm -rf build
           fi
 
-      - name: Build Windows release zip
+      - name: Build Windows release installers
         run: powershell -ExecutionPolicy Bypass -File scripts/release_windows.ps1
 
-      - name: Upload release artifact
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: khine-windows
-          path: dist/windows/*.zip
+          path: |
+            dist/windows/*.exe
+            dist/windows/*.zip
