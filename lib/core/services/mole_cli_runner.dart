@@ -5,6 +5,12 @@ import 'dart:io' as io;
 import 'package:mole_ui/core/services/mole_cli_locator.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 
+final _ansiEscapePattern = RegExp(r'\x1B\[[0-?]*[ -/]*[@-~]');
+
+String stripAnsiEscapes(String text) {
+  return text.replaceAll(_ansiEscapePattern, '');
+}
+
 class MoleCliResult {
   const MoleCliResult({
     required this.exitCode,
@@ -60,8 +66,8 @@ class MoleCliRunner {
       runInShell: launch.runInShell,
     );
 
-    final stdoutText = result.stdout as String? ?? '';
-    final stderrText = result.stderr as String? ?? '';
+    final stdoutText = stripAnsiEscapes(result.stdout as String? ?? '');
+    final stderrText = stripAnsiEscapes(result.stderr as String? ?? '');
     if (logOutput) {
       _logCapturedOutput(stdoutText, isStderr: false);
       _logCapturedOutput(stderrText, isStderr: true);
@@ -178,9 +184,10 @@ class MoleCliRunner {
     }
 
     void handleLine(String line, StringBuffer buffer, {required bool isStderr}) {
-      buffer.writeln(line);
-      _logLine(line, isStderr: isStderr);
-      onOutput?.call(line);
+      final cleaned = stripAnsiEscapes(line);
+      buffer.writeln(cleaned);
+      _logLine(cleaned, isStderr: isStderr);
+      onOutput?.call(cleaned);
 
       if (autoConfirmUninstall) {
         if (MoleCliPassword.isUninstallProceedPoint(line)) {

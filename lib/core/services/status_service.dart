@@ -10,14 +10,10 @@ class StatusService {
   final MoleCliRunner _cli;
 
   Future<SystemStatus> fetchStatus() async {
-    final khineScript = windowsKhineScriptForStatus();
-    final result = khineScript == null
-        ? await _cli.runCapture(statusCommandArgs(), logOutput: false)
-        : await _cli.runKhineScriptCapture(
-            khineScript,
-            statusCommandArgs(),
-            logOutput: false,
-          );
+    final result = await _cli.runCapture(
+      statusCommandArgs(),
+      logOutput: false,
+    );
 
     if (!result.success) {
       throw Exception(

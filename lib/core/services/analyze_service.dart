@@ -11,14 +11,10 @@ class AnalyzeService {
   final MoleCliRunner _cli;
 
   Future<AnalyzeSnapshot> analyzePath([String? path]) async {
-    final khineScript = windowsKhineScriptForAnalyze();
-    final result = khineScript == null
-        ? await _cli.runCapture(analyzeCommandArgs(path), logOutput: false)
-        : await _cli.runKhineScriptCapture(
-            khineScript,
-            analyzeCommandArgs(path),
-            logOutput: false,
-          );
+    final result = await _cli.runCapture(
+      analyzeCommandArgs(path),
+      logOutput: false,
+    );
     if (!result.success) {
       throw Exception(
         result.stderr.trim().isNotEmpty

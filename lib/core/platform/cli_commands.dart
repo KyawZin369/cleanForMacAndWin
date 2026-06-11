@@ -10,7 +10,7 @@ List<String> cleanCommandArgs() {
 
 List<String> uninstallListArgs() {
   if (isWindows) {
-    return const ['uninstall', '--list'];
+    return const ['uninstall', '-List'];
   }
   return const ['uninstall', '--list'];
 }
@@ -24,7 +24,7 @@ List<String> uninstallAppsArgs(List<String> uninstallNames) {
 
 List<String> analyzeCommandArgs([String? path]) {
   if (isWindows) {
-    final args = <String>[];
+    final args = <String>['analyze', '-Json'];
     if (path != null && path.isNotEmpty) {
       args.addAll(['-Path', path]);
     }
@@ -40,17 +40,7 @@ List<String> analyzeCommandArgs([String? path]) {
 
 List<String> statusCommandArgs() {
   if (isWindows) {
-    return const [];
+    return const ['status', '-Json'];
   }
   return const ['status', '-json'];
-}
-
-String? windowsKhineScriptForAnalyze() {
-  if (!isWindows) return null;
-  return 'bin/khine/analyze_json.ps1';
-}
-
-String? windowsKhineScriptForStatus() {
-  if (!isWindows) return null;
-  return 'bin/khine/status_json.ps1';
 }
