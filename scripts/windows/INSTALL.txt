@@ -1,0 +1,32 @@
+Khine for Windows
+=================
+
+Requirements
+------------
+- Windows 10 or Windows 11 (64-bit)
+- PowerShell 5.1 or newer (included with Windows)
+
+Install
+-------
+1. Extract this zip to a folder, for example:
+   C:\Program Files\Khine
+2. Double-click Khine.exe to launch the app.
+3. Optional: pin Khine.exe to Start or the taskbar.
+
+First launch on another PC
+--------------------------
+Windows SmartScreen may warn that the publisher is unknown because this
+build is not code-signed. To run the app:
+1. Click "More info"
+2. Click "Run anyway"
+
+After the first successful launch, Windows usually remembers your choice.
+
+What is included
+----------------
+This package includes the WinMole CLI runtime inside the winmole\ folder.
+You do not need to install WinMole separately.
+
+Support
+-------
+Clean, Uninstall, Analyze, and Status features use the bundled WinMole tools.

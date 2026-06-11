@@ -44,7 +44,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-*.txt
+# Local scratch notes
+/run.txt
 
 *._*
 
