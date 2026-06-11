@@ -29,6 +29,13 @@ jobs:
         shell: bash
         run: sh scripts/setup_winmole_vendor.sh
 
+      - name: Remove stale build symlink
+        shell: bash
+        run: |
+          if [ -L build ] || { [ -e build ] && [ ! -d build ]; }; then
+            rm -rf build
+          fi
+
       - name: Build Windows release zip
         run: powershell -ExecutionPolicy Bypass -File scripts/release_windows.ps1
 

@@ -29,7 +29,21 @@ function Ensure-WinMoleVendor {
   }
 }
 
+function Remove-StaleBuildPath {
+  $buildPath = Join-Path $ProjectRoot "build"
+  if (-not (Test-Path -LiteralPath $buildPath)) {
+    return
+  }
+
+  $item = Get-Item -LiteralPath $buildPath -Force
+  if ($item.LinkType -or -not $item.PSIsContainer) {
+    Write-Host "Removing stale build symlink/file..."
+    Remove-Item -LiteralPath $buildPath -Force -Recurse
+  }
+}
+
 Write-Host "Preparing release $AppName $Version..."
+Remove-StaleBuildPath
 Ensure-WinMoleVendor
 
 if (Get-Command python -ErrorAction SilentlyContinue) {
