@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' as io;
 
+import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/mole_cli_locator.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 
@@ -98,6 +99,15 @@ class MoleCliRunner {
     final launch = await MoleCliLocator.buildLaunchSpec(args);
     _logCommand(launch.executable, launch.args);
 
+    if (currentPlatform == AppPlatform.mac && onPasswordPrompt != null) {
+      final ready = await MoleCliPassword.prepareForMoleCli();
+      if (!ready) {
+        throw StateError(
+          'Administrator credentials are required before running Mole.',
+        );
+      }
+    }
+
     final process = await io.Process.start(
       launch.executable,
       launch.args,
@@ -149,9 +159,10 @@ class MoleCliRunner {
       });
     }
 
-    Future<void> handlePasswordPrompt({bool proactive = false}) async {
+    Future<void> handlePasswordPrompt({
+      bool moleBlockedOnTty = false,
+    }) async {
       if (passwordPromptOpen || onPasswordPrompt == null) return;
-      if (proactive && await MoleCliPassword.hasActiveSudoSession()) return;
 
       passwordPromptOpen = true;
 
@@ -173,6 +184,10 @@ class MoleCliRunner {
           final authed = await MoleCliPassword.authenticateSudo(password);
           if (authed) {
             wrongPassword = false;
+            if (moleBlockedOnTty) {
+              // Mole is waiting on /dev/tty; UI auth cannot unblock it.
+              process.kill();
+            }
             return;
           }
 
@@ -202,13 +217,11 @@ class MoleCliRunner {
       if (MoleCliPassword.isWrongPasswordLine(line)) {
         wrongPassword = true;
       }
-      if (MoleCliPassword.isPasswordPromptLine(line)) {
-        unawaited(handlePasswordPrompt());
-      } else if (MoleCliPassword.isUninstallAdminRequired(line) ||
-          MoleCliPassword.isOptimizeAdminRequired(line)) {
-        unawaited(handlePasswordPrompt(proactive: true));
-      } else if (MoleCliPassword.isSudoSectionHeader(line)) {
-        unawaited(handlePasswordPrompt(proactive: true));
+      if (MoleCliPassword.isPasswordPromptLine(line) ||
+          MoleCliPassword.isUninstallAdminRequired(line) ||
+          MoleCliPassword.isOptimizeAdminRequired(line) ||
+          MoleCliPassword.isSudoSectionHeader(line)) {
+        unawaited(handlePasswordPrompt(moleBlockedOnTty: true));
       }
     }
 
@@ -222,17 +235,21 @@ class MoleCliRunner {
         .transform(const LineSplitter())
         .listen((line) => handleLine(line, stderrBuffer, isStderr: true));
 
-    final exitCode = await process.exitCode;
-    await stdoutSub.cancel();
-    await stderrSub.cancel();
-    _activeProcess = null;
-    _logExit(exitCode);
+    try {
+      final exitCode = await process.exitCode;
+      await stdoutSub.cancel();
+      await stderrSub.cancel();
+      _logExit(exitCode);
 
-    return MoleCliResult(
-      exitCode: exitCode,
-      stdout: stdoutBuffer.toString(),
-      stderr: stderrBuffer.toString(),
-    );
+      return MoleCliResult(
+        exitCode: exitCode,
+        stdout: stdoutBuffer.toString(),
+        stderr: stderrBuffer.toString(),
+      );
+    } finally {
+      await MoleCliPassword.stopSudoKeepalive();
+      _activeProcess = null;
+    }
   }
 
   void cancel() {
@@ -240,6 +257,7 @@ class MoleCliRunner {
     if (process == null) return;
     process.kill();
     _activeProcess = null;
+    unawaited(MoleCliPassword.stopSudoKeepalive());
   }
 
   void _logCommand(String executable, List<String> args) {

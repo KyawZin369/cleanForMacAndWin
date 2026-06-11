@@ -6,6 +6,19 @@ CACHE_DIR="${MOLE_UI_BUILD_DIR:-$HOME/Library/Caches/mole_ui_build}"
 
 mkdir -p "$CACHE_DIR"
 
+# A prior release/install step can leave root-owned artifacts in the cache.
+# The linker then fails with errno=13 when writing into Khine.app.
+if find "$CACHE_DIR" -user root -print -quit 2>/dev/null | grep -q .; then
+  echo "Build cache has root-owned files in $CACHE_DIR"
+  if sudo -n chown -R "$(id -un):$(id -gn)" "$CACHE_DIR" 2>/dev/null; then
+    echo "Fixed build cache ownership."
+  else
+    echo "Fix permissions, then retry:" >&2
+    echo "  sudo chown -R $(id -un) \"$CACHE_DIR\"" >&2
+    exit 1
+  fi
+fi
+
 if [ -L "$ROOT/build" ]; then
   CURRENT_TARGET="$(readlink "$ROOT/build")"
   if [ ! -e "$ROOT/build" ]; then

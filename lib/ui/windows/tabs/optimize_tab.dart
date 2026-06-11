@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:mole_ui/core/logic/clean_controller.dart';
+import 'package:mole_ui/core/logic/optimize_controller.dart';
 import 'package:mole_ui/ui/widgets/activity_progress_panel.dart';
 import 'package:mole_ui/ui/windows/widgets/fluent_widgets.dart';
 import 'package:mole_ui/ui/windows/widgets/windows_spinner.dart';
 
-class WindowsCleanTab extends StatelessWidget {
-  const WindowsCleanTab({super.key, required this.controller});
+class WindowsOptimizeTab extends StatelessWidget {
+  const WindowsOptimizeTab({super.key, required this.controller});
 
-  final CleanController controller;
+  final OptimizeController controller;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final isCleaning = controller.isCleaning;
+        final isOptimizing = controller.isOptimizing;
 
-        if (isCleaning) {
+        if (isOptimizing) {
           return Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -35,7 +35,7 @@ class WindowsCleanTab extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Cleaning your PC',
+                            'Optimizing your PC',
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w600,
@@ -44,7 +44,7 @@ class WindowsCleanTab extends StatelessWidget {
                           ),
                           SizedBox(height: 4),
                           Text(
-                            'Removing junk safely, step by step',
+                            'Tuning services and refreshing system caches',
                             style: TextStyle(
                               fontSize: 13,
                               color: Color(0xFF605E5C),
@@ -64,7 +64,7 @@ class WindowsCleanTab extends StatelessWidget {
                       percent: controller.progressPercent,
                       currentActivityLabel: controller.currentActivityLabel,
                       style: ActivityProgressStyle.windows,
-                      title: 'Cleanup steps',
+                      title: 'Optimization tasks',
                     ),
                   ),
                 ),
@@ -88,7 +88,7 @@ class WindowsCleanTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 36),
                   const Text(
-                    'Ready to clean',
+                    'Ready to optimize',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w600,
@@ -97,14 +97,15 @@ class WindowsCleanTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Free up space and remove system junk',
+                    'Refresh caches, repair services, and tune performance',
+                    textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 14, color: Color(0xFF605E5C)),
                   ),
                   const SizedBox(height: 32),
                   WindowsPrimaryButton(
-                    label: 'Clean Your PC',
+                    label: 'Optimize Your PC',
                     expanded: true,
-                    onPressed: controller.startCleaning,
+                    onPressed: controller.startOptimizing,
                   ),
                   if (controller.resultMessage != null) ...[
                     const SizedBox(height: 16),

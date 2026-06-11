@@ -39,6 +39,7 @@ class AppRouter extends StatelessWidget {
       case AppPlatform.windows:
         return WindowsApp(
           cleanController: cleanController,
+          optimizeController: optimizeController,
           uninstallController: uninstallController,
           analyzeController: analyzeController,
           statusController: statusController,

@@ -1,18 +1,28 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:mole_ui/core/logic/cli_activity.dart';
 import 'package:mole_ui/core/logic/password_prompt_state.dart';
 import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/clean_command_runner.dart';
+import 'package:mole_ui/core/services/cli_activity_parser.dart';
 import 'package:mole_ui/core/services/mole_cli_locator.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 
 /// Shared clean logic used by Mac and Windows UIs.
 class CleanController extends ChangeNotifier {
   CleanController({CleanCommandRunner? commandRunner})
-      : _commandRunner = commandRunner ?? CleanCommandRunner();
+      : _commandRunner = commandRunner ?? CleanCommandRunner(),
+        _activityParser = CliActivityParser(
+          sectionCatalog: switch (currentPlatform) {
+            AppPlatform.mac => CliSectionCatalog.macClean,
+            AppPlatform.windows => CliSectionCatalog.windowsClean,
+            AppPlatform.unsupported => const {},
+          },
+        );
 
   final CleanCommandRunner _commandRunner;
+  final CliActivityParser _activityParser;
 
   bool _isCleaning = false;
   double _progress = 0.0;
@@ -27,6 +37,8 @@ class CleanController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get resultMessage => _resultMessage;
   PasswordPromptState? get passwordPrompt => _passwordPrompt;
+  List<ActivitySection> get activitySections => _activityParser.sections;
+  String? get currentActivityLabel => _activityParser.currentActivityLabel;
 
   String get cleanCommandLabel => switch (currentPlatform) {
         AppPlatform.mac => 'mo clean',
@@ -45,22 +57,12 @@ class CleanController extends ChangeNotifier {
 
     _errorMessage = null;
     _resultMessage = null;
+    _activityParser.reset();
     notifyListeners();
 
     if (currentPlatform == AppPlatform.mac) {
-      final authed = await MoleCliPassword.ensureMacSudoCredentials(
-        onPasswordPrompt: _requestPassword,
-        message:
-            'Mole needs your Mac password to clean protected system caches.',
-      );
-      _passwordPrompt = null;
-      notifyListeners();
-      if (!authed) {
-        _errorMessage =
-            'Administrator password is required to clean protected caches.';
-        notifyListeners();
-        return;
-      }
+      final authed = await _ensureMacSudoForClean();
+      if (!authed) return;
     }
 
     _isCleaning = true;
@@ -76,6 +78,7 @@ class CleanController extends ChangeNotifier {
       );
 
       _stopIndeterminateProgress();
+      _activityParser.finish();
 
       if (!_isCleaning) return;
 
@@ -121,6 +124,33 @@ class CleanController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> _ensureMacSudoForClean() async {
+    const message =
+        'Mole needs your Mac password to clean protected system caches.';
+
+    final authed = await MoleCliPassword.ensureMacSudoCredentials(
+      onPasswordPrompt: _requestPassword,
+      message: message,
+    );
+    _passwordPrompt = null;
+    notifyListeners();
+    if (!authed) {
+      _errorMessage =
+          'Administrator password is required to clean protected caches.';
+      notifyListeners();
+      return false;
+    }
+
+    if (!await MoleCliPassword.prepareForMoleCli()) {
+      _errorMessage =
+          'Could not verify administrator access. Try Clean again.';
+      notifyListeners();
+      return false;
+    }
+
+    return true;
+  }
+
   Future<String?> _requestPassword(MolePasswordPrompt prompt) {
     final completer = Completer<String?>();
     _passwordPrompt = PasswordPromptState(
@@ -134,21 +164,28 @@ class CleanController extends ChangeNotifier {
   }
 
   void _handleCommandOutput(String line) {
+    _activityParser.handleLine(line);
+
     final parsed = parseProgressFromOutput(line);
     if (parsed != null) {
       _progress = parsed;
-      notifyListeners();
+    } else if (_activityParser.sections.isNotEmpty) {
+      _progress = _activityParser.progress;
     }
+
+    notifyListeners();
   }
 
   void _startIndeterminateProgress() {
     _progressTimer?.cancel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (!_isCleaning) return;
-      if (_progress < 0.9) {
+      if (_activityParser.sections.isNotEmpty) {
+        _progress = _activityParser.progress;
+      } else if (_progress < 0.12) {
         _progress += 0.01;
-        notifyListeners();
       }
+      notifyListeners();
     });
   }
 
@@ -162,6 +199,7 @@ class CleanController extends ChangeNotifier {
     _stopIndeterminateProgress();
     _passwordPrompt?.completer.complete(null);
     _commandRunner.cancel();
+    unawaited(MoleCliPassword.stopSudoKeepalive());
     super.dispose();
   }
 }

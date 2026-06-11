@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:io' as io;
 
+import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/mole_cli_locator.dart';
 
 class MolePasswordPrompt {
@@ -22,6 +24,7 @@ class MoleCliPassword {
   MoleCliPassword._();
 
   static final _ansiEscape = RegExp(r'\x1B\[[0-9;?]*[ -/]*[@-~]');
+  static io.Process? _sudoKeepaliveProcess;
 
   static final passwordPromptLine = RegExp(
     r'Password:\s*$|Enter your credentials|Admin access required',
@@ -91,8 +94,17 @@ class MoleCliPassword {
     return normalizeCliLine(line).contains('Admin required');
   }
 
-  static Future<bool> hasActiveSudoSession() async {
-    final result = await io.Process.run('sudo', ['-n', 'true']);
+  static Future<bool> hasActiveSudoSession({
+    Map<String, String>? environment,
+  }) async {
+    if (currentPlatform != AppPlatform.mac) return false;
+
+    final env = environment ?? await MoleCliLocator.macProcessEnvironment();
+    final result = await io.Process.run(
+      'sudo',
+      ['-n', 'true'],
+      environment: env,
+    );
     return result.exitCode == 0;
   }
 
@@ -106,7 +118,64 @@ class MoleCliPassword {
     process.stdin.write('$password\n');
     await process.stdin.close();
     final exitCode = await process.exitCode;
-    return exitCode == 0;
+    if (exitCode != 0) return false;
+
+    return prepareForMoleCli();
+  }
+
+  /// Verifies sudo is cached for the Mole CLI environment and starts a
+  /// keepalive so `mo` never blocks on `/dev/tty` password prompts.
+  static Future<bool> prepareForMoleCli() async {
+    if (currentPlatform != AppPlatform.mac) return true;
+
+    final environment = await MoleCliLocator.macProcessEnvironment();
+    if (!await hasActiveSudoSession(environment: environment)) {
+      return false;
+    }
+
+    final refresh = await io.Process.run(
+      'sudo',
+      ['-n', '-v'],
+      environment: environment,
+    );
+    if (refresh.exitCode != 0) {
+      return false;
+    }
+
+    await startSudoKeepalive(environment: environment);
+    return true;
+  }
+
+  static Future<void> startSudoKeepalive({
+    Map<String, String>? environment,
+  }) async {
+    if (currentPlatform != AppPlatform.mac) return;
+
+    await stopSudoKeepalive();
+
+    final env = environment ?? await MoleCliLocator.macProcessEnvironment();
+    final keepalive = await io.Process.start(
+      '/bin/sh',
+      [
+        '-c',
+        'sleep 2; while sudo -n -v 2>/dev/null; do sleep 30; done',
+      ],
+      environment: env,
+    );
+    _sudoKeepaliveProcess = keepalive;
+    unawaited(keepalive.exitCode.then((_) {
+      if (identical(_sudoKeepaliveProcess, keepalive)) {
+        _sudoKeepaliveProcess = null;
+      }
+    }));
+  }
+
+  static Future<void> stopSudoKeepalive() async {
+    final process = _sudoKeepaliveProcess;
+    _sudoKeepaliveProcess = null;
+    if (process == null) return;
+    process.kill();
+    await process.exitCode.catchError((_) => -1);
   }
 
   /// Caches sudo credentials before `mo` runs. `sudo` reads from `/dev/tty`,
@@ -115,7 +184,7 @@ class MoleCliPassword {
     required MolePasswordPromptCallback onPasswordPrompt,
     required String message,
   }) async {
-    if (await hasActiveSudoSession()) return true;
+    if (await prepareForMoleCli()) return true;
 
     var isRetry = false;
     while (true) {
@@ -140,7 +209,9 @@ class MoleCliPassword {
       if (trimmed.isEmpty || trimmed.startsWith('===')) continue;
       if (trimmed.contains('Cleanup complete') ||
           trimmed.contains('Space freed:') ||
-          trimmed.contains('Free space now:')) {
+          trimmed.contains('Free space now:') ||
+          trimmed.contains('System is already clean') ||
+          trimmed.contains('Free space on')) {
         summary.add(trimmed);
       }
     }
@@ -157,7 +228,9 @@ class MoleCliPassword {
           trimmed.contains('Dry Run Complete') ||
           (trimmed.contains('Applied') && trimmed.contains('optimizations')) ||
           trimmed.contains('System fully optimized') ||
-          trimmed.contains('Would apply') && trimmed.contains('optimizations')) {
+          trimmed.contains('Optimizations applied:') ||
+          trimmed.contains('System health:') ||
+          (trimmed.contains('Would apply') && trimmed.contains('optimizations'))) {
         summary.add(trimmed);
       }
     }

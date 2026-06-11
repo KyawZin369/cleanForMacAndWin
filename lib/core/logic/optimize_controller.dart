@@ -1,18 +1,29 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:mole_ui/core/logic/cli_activity.dart';
 import 'package:mole_ui/core/logic/password_prompt_state.dart';
 import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/clean_command_runner.dart';
+import 'package:mole_ui/core/services/cli_activity_parser.dart';
 import 'package:mole_ui/core/services/mole_cli_locator.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
 /// Shared optimize logic used by Mac and Windows UIs.
 class OptimizeController extends ChangeNotifier {
-  OptimizeController({MoleCliRunner? cli}) : _cli = cli ?? MoleCliRunner();
+  OptimizeController({MoleCliRunner? cli})
+      : _cli = cli ?? MoleCliRunner(),
+        _activityParser = CliActivityParser(
+          sectionCatalog: switch (currentPlatform) {
+            AppPlatform.mac => CliSectionCatalog.optimize,
+            AppPlatform.windows => CliSectionCatalog.windowsOptimize,
+            AppPlatform.unsupported => const {},
+          },
+        );
 
   final MoleCliRunner _cli;
+  final CliActivityParser _activityParser;
 
   bool _isOptimizing = false;
   double _progress = 0.0;
@@ -27,6 +38,8 @@ class OptimizeController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get resultMessage => _resultMessage;
   PasswordPromptState? get passwordPrompt => _passwordPrompt;
+  List<ActivitySection> get activitySections => _activityParser.sections;
+  String? get currentActivityLabel => _activityParser.currentActivityLabel;
 
   String get optimizeCommandLabel => switch (currentPlatform) {
         AppPlatform.mac => 'mo optimize',
@@ -45,22 +58,12 @@ class OptimizeController extends ChangeNotifier {
 
     _errorMessage = null;
     _resultMessage = null;
+    _activityParser.reset();
     notifyListeners();
 
     if (currentPlatform == AppPlatform.mac) {
-      final authed = await MoleCliPassword.ensureMacSudoCredentials(
-        onPasswordPrompt: _requestPassword,
-        message:
-            'Mole needs your Mac password to optimize protected system caches.',
-      );
-      _passwordPrompt = null;
-      notifyListeners();
-      if (!authed) {
-        _errorMessage =
-            'Administrator password is required to optimize system caches.';
-        notifyListeners();
-        return;
-      }
+      final authed = await _ensureMacSudoForOptimize();
+      if (!authed) return;
     }
 
     _isOptimizing = true;
@@ -79,6 +82,7 @@ class OptimizeController extends ChangeNotifier {
       );
 
       _stopIndeterminateProgress();
+      _activityParser.finish();
 
       if (!_isOptimizing) return;
 
@@ -92,12 +96,19 @@ class OptimizeController extends ChangeNotifier {
       } else {
         _progress = 0;
         _resultMessage = null;
-        final message = result.stderr.trim().isNotEmpty
-            ? result.stderr.trim()
-            : result.stdout.trim();
-        _errorMessage = message.isNotEmpty
-            ? message
-            : 'Optimize failed (exit ${result.exitCode})';
+        final output = '${result.stdout}\n${result.stderr}';
+        if (output.contains('Enter your credentials') ||
+            output.contains('System optimization requires admin access')) {
+          _errorMessage =
+              'Administrator access is required. Tap Optimize again to continue.';
+        } else {
+          final message = result.stderr.trim().isNotEmpty
+              ? result.stderr.trim()
+              : result.stdout.trim();
+          _errorMessage = message.isNotEmpty
+              ? message
+              : 'Optimize failed (exit ${result.exitCode})';
+        }
       }
     } on MoleCliNotFoundException catch (error) {
       _stopIndeterminateProgress();
@@ -131,6 +142,33 @@ class OptimizeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> _ensureMacSudoForOptimize() async {
+    const message =
+        'Mole needs your Mac password to optimize protected system caches.';
+
+    final authed = await MoleCliPassword.ensureMacSudoCredentials(
+      onPasswordPrompt: _requestPassword,
+      message: message,
+    );
+    _passwordPrompt = null;
+    notifyListeners();
+    if (!authed) {
+      _errorMessage =
+          'Administrator password is required to optimize system caches.';
+      notifyListeners();
+      return false;
+    }
+
+    if (!await MoleCliPassword.prepareForMoleCli()) {
+      _errorMessage =
+          'Could not verify administrator access. Try Optimize again.';
+      notifyListeners();
+      return false;
+    }
+
+    return true;
+  }
+
   Future<String?> _requestPassword(MolePasswordPrompt prompt) {
     final completer = Completer<String?>();
     _passwordPrompt = PasswordPromptState(
@@ -144,21 +182,28 @@ class OptimizeController extends ChangeNotifier {
   }
 
   void _handleCommandOutput(String line) {
+    _activityParser.handleLine(line);
+
     final parsed = parseProgressFromOutput(line);
     if (parsed != null) {
       _progress = parsed;
-      notifyListeners();
+    } else if (_activityParser.sections.isNotEmpty) {
+      _progress = _activityParser.progress;
     }
+
+    notifyListeners();
   }
 
   void _startIndeterminateProgress() {
     _progressTimer?.cancel();
     _progressTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
       if (!_isOptimizing) return;
-      if (_progress < 0.9) {
+      if (_activityParser.sections.isNotEmpty) {
+        _progress = _activityParser.progress;
+      } else if (_progress < 0.12) {
         _progress += 0.01;
-        notifyListeners();
       }
+      notifyListeners();
     });
   }
 
@@ -172,6 +217,7 @@ class OptimizeController extends ChangeNotifier {
     _stopIndeterminateProgress();
     _passwordPrompt?.completer.complete(null);
     _cli.cancel();
+    unawaited(MoleCliPassword.stopSudoKeepalive());
     super.dispose();
   }
 }

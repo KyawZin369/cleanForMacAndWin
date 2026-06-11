@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mole_ui/core/logic/analyze_controller.dart';
 import 'package:mole_ui/core/logic/clean_controller.dart';
+import 'package:mole_ui/core/logic/optimize_controller.dart';
 import 'package:mole_ui/core/logic/status_controller.dart';
 import 'package:mole_ui/core/logic/uninstall_controller.dart';
 import 'package:mole_ui/core/logic/winmole_gate_controller.dart';
@@ -12,12 +13,14 @@ class WindowsApp extends StatefulWidget {
   const WindowsApp({
     super.key,
     required this.cleanController,
+    required this.optimizeController,
     required this.uninstallController,
     required this.analyzeController,
     required this.statusController,
   });
 
   final CleanController cleanController;
+  final OptimizeController optimizeController;
   final UninstallController uninstallController;
   final AnalyzeController analyzeController;
   final StatusController statusController;
@@ -78,6 +81,7 @@ class _WindowsAppState extends State<WindowsApp> {
         if (_gateController.isReady) {
           return WindowsHomePage(
             cleanController: widget.cleanController,
+            optimizeController: widget.optimizeController,
             uninstallController: widget.uninstallController,
             analyzeController: widget.analyzeController,
             statusController: widget.statusController,

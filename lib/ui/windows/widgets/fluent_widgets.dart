@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 enum WindowsHomeSection {
   clean('Clean', Icons.cleaning_services_outlined),
+  optimize('Optimize', Icons.tune_outlined),
   uninstall('Uninstall', Icons.delete_outline),
   analyze('Analyze', Icons.pie_chart_outline),
   status('Status', Icons.monitor_heart_outlined);

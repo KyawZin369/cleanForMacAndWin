@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:mole_ui/core/logic/analyze_controller.dart';
 import 'package:mole_ui/core/logic/clean_controller.dart';
+import 'package:mole_ui/core/logic/optimize_controller.dart';
 import 'package:mole_ui/core/logic/status_controller.dart';
 import 'package:mole_ui/core/logic/uninstall_controller.dart';
 import 'package:mole_ui/ui/widgets/app_logo.dart';
 import 'package:mole_ui/ui/windows/tabs/analyze_tab.dart';
 import 'package:mole_ui/ui/windows/tabs/clean_tab.dart';
+import 'package:mole_ui/ui/windows/tabs/optimize_tab.dart';
 import 'package:mole_ui/ui/windows/tabs/status_tab.dart';
 import 'package:mole_ui/ui/windows/tabs/uninstall_tab.dart';
 import 'package:mole_ui/ui/windows/widgets/fluent_widgets.dart';
@@ -14,12 +16,14 @@ class WindowsHomePage extends StatefulWidget {
   const WindowsHomePage({
     super.key,
     required this.cleanController,
+    required this.optimizeController,
     required this.uninstallController,
     required this.analyzeController,
     required this.statusController,
   });
 
   final CleanController cleanController;
+  final OptimizeController optimizeController;
   final UninstallController uninstallController;
   final AnalyzeController analyzeController;
   final StatusController statusController;
@@ -61,6 +65,10 @@ class _WindowsHomePageState extends State<WindowsHomePage> {
         child: switch (_selected) {
           WindowsHomeSection.clean =>
             WindowsCleanTab(key: const ValueKey('clean'), controller: widget.cleanController),
+          WindowsHomeSection.optimize => WindowsOptimizeTab(
+              key: const ValueKey('optimize'),
+              controller: widget.optimizeController,
+            ),
           WindowsHomeSection.uninstall => WindowsUninstallTab(
               key: const ValueKey('uninstall'),
               controller: widget.uninstallController,
