@@ -43,6 +43,30 @@ class MoleCliRunner {
     return _runCaptureLaunch(launch, logOutput: logOutput);
   }
 
+  Future<MoleCliResult> runKhineScriptStreaming(
+    String scriptRelative,
+    List<String> args, {
+    void Function(String line)? onOutput,
+    MolePasswordPromptCallback? onPasswordPrompt,
+    String passwordPromptMessage =
+        'Administrator access is required for this operation.',
+  }) async {
+    if (_activeProcess != null) {
+      throw StateError('A Mole CLI command is already running.');
+    }
+
+    final launch = await MoleCliLocator.buildKhineScriptLaunchSpec(
+      scriptRelative,
+      args,
+    );
+    return _runStreamingLaunch(
+      launch,
+      onOutput: onOutput,
+      onPasswordPrompt: onPasswordPrompt,
+      passwordPromptMessage: passwordPromptMessage,
+    );
+  }
+
   Future<MoleCliResult> runCapture(
     List<String> args, {
     bool logOutput = true,
@@ -97,6 +121,23 @@ class MoleCliRunner {
     }
 
     final launch = await MoleCliLocator.buildLaunchSpec(args);
+    return _runStreamingLaunch(
+      launch,
+      onOutput: onOutput,
+      onPasswordPrompt: onPasswordPrompt,
+      passwordPromptMessage: passwordPromptMessage,
+      autoConfirmUninstall: autoConfirmUninstall,
+    );
+  }
+
+  Future<MoleCliResult> _runStreamingLaunch(
+    CliLaunchSpec launch, {
+    void Function(String line)? onOutput,
+    MolePasswordPromptCallback? onPasswordPrompt,
+    String passwordPromptMessage =
+        'Mole needs your Mac password to clean protected system caches.',
+    bool autoConfirmUninstall = false,
+  }) async {
     _logCommand(launch.executable, launch.args);
 
     if (currentPlatform == AppPlatform.mac && onPasswordPrompt != null) {
@@ -159,10 +200,9 @@ class MoleCliRunner {
       });
     }
 
-    Future<void> handlePasswordPrompt({
-      bool moleBlockedOnTty = false,
-    }) async {
+    Future<void> handlePasswordPrompt() async {
       if (passwordPromptOpen || onPasswordPrompt == null) return;
+      if (await MoleCliPassword.hasActiveSudoSession()) return;
 
       passwordPromptOpen = true;
 
@@ -184,10 +224,6 @@ class MoleCliRunner {
           final authed = await MoleCliPassword.authenticateSudo(password);
           if (authed) {
             wrongPassword = false;
-            if (moleBlockedOnTty) {
-              // Mole is waiting on /dev/tty; UI auth cannot unblock it.
-              process.kill();
-            }
             return;
           }
 
@@ -217,11 +253,13 @@ class MoleCliRunner {
       if (MoleCliPassword.isWrongPasswordLine(line)) {
         wrongPassword = true;
       }
+
+      // Only react to real credential prompts. Section headers such as
+      // "➤ App caches" are progress output, not password requests.
       if (MoleCliPassword.isPasswordPromptLine(line) ||
           MoleCliPassword.isUninstallAdminRequired(line) ||
-          MoleCliPassword.isOptimizeAdminRequired(line) ||
-          MoleCliPassword.isSudoSectionHeader(line)) {
-        unawaited(handlePasswordPrompt(moleBlockedOnTty: true));
+          MoleCliPassword.isOptimizeAdminRequired(line)) {
+        unawaited(handlePasswordPrompt());
       }
     }
 
@@ -247,7 +285,6 @@ class MoleCliRunner {
         stderr: stderrBuffer.toString(),
       );
     } finally {
-      await MoleCliPassword.stopSudoKeepalive();
       _activeProcess = null;
     }
   }

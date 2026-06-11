@@ -16,6 +16,13 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 robocopy $vendor $OutputDir /E /XD .git tests /XF ._* /NFL /NDL /NJH /NJS /NP | Out-Null
+
+$khineSource = Join-Path $ProjectRoot "scripts\windows\khine"
+if (Test-Path $khineSource) {
+  $khineDest = Join-Path $OutputDir "bin\khine"
+  New-Item -ItemType Directory -Force -Path $khineDest | Out-Null
+  robocopy $khineSource $khineDest *.ps1 /NFL /NDL /NJH /NJS /NP | Out-Null
+}
 if ($LASTEXITCODE -ge 8) {
   Write-Error "robocopy failed with exit code $LASTEXITCODE"
   exit 1

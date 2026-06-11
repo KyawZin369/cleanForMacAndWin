@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:mole_ui/core/models/system_status.dart';
 import 'package:mole_ui/core/platform/cli_commands.dart';
+import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
 class StatusService {
@@ -10,10 +11,16 @@ class StatusService {
   final MoleCliRunner _cli;
 
   Future<SystemStatus> fetchStatus() async {
-    final result = await _cli.runCapture(
-      statusCommandArgs(),
-      logOutput: false,
-    );
+    final result = isWindows
+        ? await _cli.runKhineScriptCapture(
+            'bin/khine/status_json.ps1',
+            const [],
+            logOutput: false,
+          )
+        : await _cli.runCapture(
+            statusCommandArgs(),
+            logOutput: false,
+          );
 
     if (!result.success) {
       throw Exception(

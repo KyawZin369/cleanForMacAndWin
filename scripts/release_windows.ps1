@@ -30,6 +30,13 @@ function Ensure-WinMoleVendor {
   if (-not (Test-Path $script)) {
     throw "WinMole vendor setup failed."
   }
+
+  $khineSource = Join-Path $ProjectRoot "scripts\windows\khine"
+  if (Test-Path $khineSource) {
+    $khineDest = Join-Path $vendor "bin\khine"
+    New-Item -ItemType Directory -Force -Path $khineDest | Out-Null
+    Copy-Item -Path (Join-Path $khineSource "*.ps1") -Destination $khineDest -Force
+  }
 }
 
 function Remove-StaleBuildPath {

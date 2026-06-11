@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:mole_ui/core/models/uninstall_app.dart';
 import 'package:mole_ui/core/platform/cli_commands.dart';
+import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
@@ -11,10 +12,16 @@ class UninstallService {
   final MoleCliRunner _cli;
 
   Future<List<UninstallApp>> fetchApps() async {
-    final result = await _cli.runCapture(
-      uninstallListArgs(),
-      logOutput: false,
-    );
+    final result = isWindows
+        ? await _cli.runKhineScriptCapture(
+            'bin/khine/uninstall_list.ps1',
+            const [],
+            logOutput: false,
+          )
+        : await _cli.runCapture(
+            uninstallListArgs(),
+            logOutput: false,
+          );
     if (!result.success) {
       throw Exception(
         result.stderr.trim().isNotEmpty
@@ -39,6 +46,15 @@ class UninstallService {
   }) {
     if (uninstallNames.isEmpty) {
       throw ArgumentError('No apps selected for uninstall.');
+    }
+
+    if (isWindows) {
+      return _cli.runKhineScriptStreaming(
+        'bin/khine/uninstall_apps.ps1',
+        uninstallNames,
+        onOutput: onOutput,
+        onPasswordPrompt: onPasswordPrompt,
+      );
     }
 
     return _cli.runStreaming(

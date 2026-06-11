@@ -105,9 +105,11 @@ class MoleCliLocator {
   static Future<bool> isWinMoleOnPath() async {
     if (currentPlatform != AppPlatform.windows) return false;
 
+    if (await isBundledRuntimeAvailable()) return true;
+
     final result = await Process.run(
       'where',
-      ['winmole'],
+      ['winmole.ps1'],
       runInShell: true,
     );
     if (result.exitCode != 0) return false;
@@ -459,6 +461,7 @@ class MoleCliLocator {
     if (root != null) {
       env['WINMOLE_VENDOR_ROOT'] = root;
       env['WINMOLE_ROOT'] = root;
+      env['WINMOLE_NONINTERACTIVE'] = '1';
       final binDir = '$root\\bin';
       final path = env['PATH'] ?? '';
       if (!path.toLowerCase().contains(binDir.toLowerCase())) {
