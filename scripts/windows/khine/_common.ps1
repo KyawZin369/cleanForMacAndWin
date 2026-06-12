@@ -4,9 +4,22 @@
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-if (-not $script:WINMOLE_ROOT) {
-    $script:WINMOLE_ROOT = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$resolvedRoot = $null
+if (Get-Variable -Name WINMOLE_ROOT -Scope Script -ErrorAction SilentlyContinue) {
+    $resolvedRoot = $script:WINMOLE_ROOT
 }
+if (-not $resolvedRoot) {
+    if ($env:WINMOLE_ROOT) {
+        $resolvedRoot = $env:WINMOLE_ROOT.TrimEnd('\')
+    }
+    elseif ($env:WINMOLE_VENDOR_ROOT) {
+        $resolvedRoot = $env:WINMOLE_VENDOR_ROOT.TrimEnd('\')
+    }
+    else {
+        $resolvedRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+    }
+}
+$script:WINMOLE_ROOT = $resolvedRoot
 
 $script:WINMOLE_LIB = Join-Path $script:WINMOLE_ROOT 'lib'
 

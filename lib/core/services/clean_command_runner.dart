@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:mole_ui/core/platform/cli_commands.dart';
+import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/core/services/mole_cli_password.dart';
 import 'package:mole_ui/core/services/mole_cli_runner.dart';
 
@@ -39,11 +40,18 @@ class CleanCommandRunner {
     required void Function(String line) onOutput,
     MolePasswordPromptCallback? onPasswordPrompt,
   }) async {
-    final result = await _cli.runStreaming(
-      cleanCommandArgs(),
-      onOutput: onOutput,
-      onPasswordPrompt: onPasswordPrompt,
-    );
+    final result = isWindows
+        ? await _cli.runKhineScriptStreaming(
+            'bin/khine/clean_run.ps1',
+            const [],
+            onOutput: onOutput,
+            onPasswordPrompt: onPasswordPrompt,
+          )
+        : await _cli.runStreaming(
+            cleanCommandArgs(),
+            onOutput: onOutput,
+            onPasswordPrompt: onPasswordPrompt,
+          );
 
     return CleanCommandResult(
       exitCode: result.exitCode,

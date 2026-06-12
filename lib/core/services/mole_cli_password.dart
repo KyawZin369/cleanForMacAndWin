@@ -120,39 +120,29 @@ class MoleCliPassword {
     final exitCode = await process.exitCode;
     if (exitCode != 0) return false;
 
-    // Refresh the ticket with the same environment `mo` will inherit.
+    return prepareForMoleCli();
+  }
+
+  /// Verifies sudo is cached for the Mole CLI environment and starts a
+  /// keepalive so `mo` never blocks on `/dev/tty` password prompts.
+  static Future<bool> prepareForMoleCli() async {
+    if (currentPlatform != AppPlatform.mac) return true;
+
+    final environment = await MoleCliLocator.macProcessEnvironment();
+    if (!await hasActiveSudoSession(environment: environment)) {
+      return false;
+    }
+
     final refresh = await io.Process.run(
       'sudo',
       ['-n', '-v'],
       environment: environment,
     );
-    if (refresh.exitCode != 0) return false;
-
-    return prepareForMoleCli(environment: environment);
-  }
-
-  /// Verifies sudo is cached for the Mole CLI environment and starts a
-  /// keepalive so `mo` never blocks on `/dev/tty` password prompts.
-  static Future<bool> prepareForMoleCli({
-    Map<String, String>? environment,
-  }) async {
-    if (currentPlatform != AppPlatform.mac) return true;
-
-    final env = environment ?? await MoleCliLocator.macProcessEnvironment();
-    if (!await hasActiveSudoSession(environment: env)) {
-      return false;
-    }
-
-    final refresh = await io.Process.run(
-      'sudo',
-      ['-n', '-v'],
-      environment: env,
-    );
     if (refresh.exitCode != 0) {
       return false;
     }
 
-    await startSudoKeepalive(environment: env);
+    await startSudoKeepalive(environment: environment);
     return true;
   }
 
@@ -221,7 +211,9 @@ class MoleCliPassword {
           trimmed.contains('Space freed:') ||
           trimmed.contains('Free space now:') ||
           trimmed.contains('System is already clean') ||
-          trimmed.contains('Free space on')) {
+          trimmed.contains('Free space on') ||
+          trimmed.contains('Cleaned:') ||
+          trimmed.contains('Would clean:')) {
         summary.add(trimmed);
       }
     }

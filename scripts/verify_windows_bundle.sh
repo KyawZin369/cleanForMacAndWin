@@ -23,6 +23,10 @@ if grep -q 'Clear-UserCaches' "$VENDOR/bin/clean.ps1" 2>/dev/null; then
   echo "  BROKEN  clean.ps1 still calls missing Clear-UserCaches"
   FAIL=1
 fi
+if grep -q 'Invoke-DevCleanup' "$VENDOR/bin/clean.ps1" 2>/dev/null; then
+  echo "  BROKEN  clean.ps1 still calls missing Invoke-DevCleanup"
+  FAIL=1
+fi
 check "$VENDOR/bin/optimize.ps1"
 check "$VENDOR/bin/analyze.exe"
 check "$VENDOR/bin/status.exe"
@@ -30,7 +34,7 @@ check "$VENDOR/lib/core/common.ps1"
 
 echo ""
 echo "Checking Khine Windows adapters..."
-for script in _common.ps1 analyze_json.ps1 status_json.ps1 uninstall_list.ps1 uninstall_apps.ps1 uninstall_lib.ps1; do
+for script in _common.ps1 analyze_json.ps1 status_json.ps1 clean_run.ps1 uninstall_list.ps1 uninstall_apps.ps1 uninstall_lib.ps1; do
   check "$KHINE/$script"
   check "$VENDOR/bin/khine/$script"
 done

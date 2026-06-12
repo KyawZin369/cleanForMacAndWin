@@ -83,13 +83,11 @@ class OptimizeTab extends StatelessWidget {
           }
 
           return Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   AestheticSpinner(
                     isAnimating: false,
                     progress: controller.progress,
@@ -129,7 +127,6 @@ class OptimizeTab extends StatelessWidget {
                     GlassActionErrorText(message: controller.errorMessage!),
                   ],
                 ],
-                ),
               ),
             ),
           );

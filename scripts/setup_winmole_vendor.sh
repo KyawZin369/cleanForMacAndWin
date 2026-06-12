@@ -18,11 +18,16 @@ apply_khine_patches() {
     sed -i.bak \
       -e 's/Clear-BrowserCaches/Clear-BrowserCacheFiles/g' \
       -e 's/Clear-ApplicationCaches/Clear-CommonAppCaches/g' \
-      -e 's/Invoke-DevCleanup -All/Invoke-DevToolsCleanup/g' \
       -e 's/Clear-WindowsUpdateCache/Clear-WindowsUpdateDownloads/g' \
       "$CLEAN"
     rm -f "$CLEAN.bak"
     echo "Patched clean.ps1 (fixed upstream missing function names)"
+  fi
+
+  if [ -f "$CLEAN" ] && grep -q 'Invoke-DevCleanup' "$CLEAN"; then
+    sed -i.bak 's/Invoke-DevCleanup -All/Invoke-DevToolsCleanup/' "$CLEAN"
+    rm -f "$CLEAN.bak"
+    echo "Patched clean.ps1 (Invoke-DevToolsCleanup)"
   fi
 }
 
