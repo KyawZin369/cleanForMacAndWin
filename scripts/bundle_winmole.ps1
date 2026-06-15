@@ -6,7 +6,7 @@ param(
 
 $vendor = Join-Path $ProjectRoot "vendor\WinMole"
 if (-not (Test-Path (Join-Path $vendor "winmole.ps1"))) {
-  Write-Error "WinMole vendor missing. Run: sh scripts/setup_winmole_vendor.sh"
+  Write-Error "WinMole vendor missing. Run: powershell -File scripts\setup_winmole_vendor.ps1"
   exit 1
 }
 

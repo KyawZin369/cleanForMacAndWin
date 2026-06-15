@@ -28,9 +28,9 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
-      - name: Vendor WinMole
-        shell: bash
-        run: sh scripts/setup_winmole_vendor.sh
+      # Re-sync Khine patches/adapters (WinMole source is vendored in vendor/WinMole).
+      - name: Prepare WinMole vendor
+        run: powershell -ExecutionPolicy Bypass -File scripts/setup_winmole_vendor.ps1
 
       - name: Remove stale build symlink
         shell: bash

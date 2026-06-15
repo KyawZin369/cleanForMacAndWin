@@ -6,7 +6,8 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location $ProjectRoot
 
-& (Join-Path $PSScriptRoot "setup_winmole_vendor.sh")
+$setupScript = Join-Path $PSScriptRoot "setup_winmole_vendor.ps1"
+& $setupScript -ProjectRoot $ProjectRoot
 
 $env:WINMOLE_VENDOR_ROOT = Join-Path $ProjectRoot "vendor\WinMole"
 $env:MOLE_VENDOR_ROOT = $env:WINMOLE_VENDOR_ROOT

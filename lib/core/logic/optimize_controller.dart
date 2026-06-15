@@ -77,8 +77,9 @@ class OptimizeController extends ChangeNotifier {
         ['optimize'],
         onOutput: _handleCommandOutput,
         onPasswordPrompt: _requestPassword,
-        passwordPromptMessage:
-            'Mole needs your Mac password to optimize protected system caches.',
+        passwordPromptMessage: isWindows
+            ? 'Administrator access is required for this operation.'
+            : 'Mole needs your Mac password to optimize protected system caches.',
       );
 
       _stopIndeterminateProgress();

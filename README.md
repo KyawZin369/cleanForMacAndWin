@@ -43,44 +43,34 @@ Outputs `dist/macos/Khine-<version>-macos.zip`.
 - Visual Studio 2022 with **Desktop development with C++**
 - PowerShell 5.1+ (built into Windows)
 
-### Setup & run
+### Setup & run (development)
 
 ```powershell
 git clone <this-repo>
 cd cleanForMacAndWin
-sh scripts/setup_winmole_vendor.sh
-flutter pub get
-$env:WINMOLE_VENDOR_ROOT = "$PWD\vendor\WinMole"
-flutter run -d windows
-```
-
-Or:
-
-```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run_windows.ps1
 ```
 
-### How Windows features work
-
-| Feature | CLI path |
-|---------|----------|
-| Clean | Bundled `winmole.ps1 clean -All` |
-| Optimize | Bundled `winmole.ps1 optimize` |
-| Uninstall | Khine adapter `bin/khine/uninstall_*.ps1` |
-| Analyze | Khine adapter `bin/khine/analyze_json.ps1` |
-| Status | Khine adapter `bin/khine/status_json.ps1` |
-
-Khine-specific adapters live in `scripts/windows/khine/` and are copied into `vendor/WinMole/bin/khine/` during vendor setup. They output JSON for the Flutter UI (same models as macOS).
+`run_windows.ps1` fetches WinMole, applies patches, and launches the app. No manual vendor setup or environment variables.
 
 ### Release
 
-On Windows 10/11:
+On Windows 10/11, one command builds everything (vendor fetch, Flutter build, installer, zip):
 
 ```powershell
+git clone <this-repo>
+cd cleanForMacAndWin
 powershell -ExecutionPolicy Bypass -File scripts\release_windows.ps1
 ```
 
-Outputs installer and portable zip under `dist/windows/`.
+Outputs under `dist/windows/`:
+
+| File | For end users |
+|------|----------------|
+| `Khine-<version>-windows-setup.exe` | **Recommended.** Double-click to install. No Flutter, Git, or WinMole needed. |
+| `Khine-<version>-windows.zip` | Portable. Extract anywhere and run `Khine.exe`. |
+
+End users only run the installer or `Khine.exe`. WinMole is bundled inside the app.
 
 ## Updating vendored CLIs
 
@@ -89,10 +79,17 @@ Outputs installer and portable zip under `dist/windows/`.
 ```bash
 rm -rf vendor/Mole
 git clone --depth 1 https://github.com/tw93/Mole.git vendor/Mole
+sh scripts/strip_vendor_git.sh vendor/Mole
 ./scripts/build_mole.sh
 ```
 
 **WinMole (Windows):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup_winmole_vendor.ps1
+```
+
+Or on macOS/Linux (CI / cross-platform):
 
 ```bash
 sh scripts/setup_winmole_vendor.sh

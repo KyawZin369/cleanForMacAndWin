@@ -1,7 +1,15 @@
-# Builds Khine Windows release artifacts:
+# Builds Khine Windows release artifacts (one command — no manual setup):
 #   - Khine-<version>-windows-setup.exe  (recommended installer)
 #   - Khine-<version>-windows.zip        (portable)
-# Run on Windows 10/11 with Flutter + Visual Studio C++ tools installed.
+#
+# Prerequisites (install once on the build machine):
+#   - Flutter SDK (Windows desktop)
+#   - Visual Studio 2022 with Desktop development with C++
+#   - Git for Windows
+#   - Python 3 (optional, for icon generation)
+#   - Inno Setup 6 (optional; auto-installed via Chocolatey when available)
+#
+# End users only need to run the setup.exe or extract the zip — WinMole is bundled.
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
   [switch]$SkipInstaller
@@ -16,28 +24,6 @@ if (-not $VersionLine) {
   throw "Could not read version from pubspec.yaml"
 }
 $Version = ($VersionLine.Matches.Groups[1].Value.Trim() -split '\+')[0]
-
-function Ensure-WinMoleVendor {
-  $vendor = Join-Path $ProjectRoot "vendor\WinMole"
-  $script = Join-Path $vendor "winmole.ps1"
-  if (Test-Path $script) {
-    return
-  }
-
-  Write-Host "Fetching WinMole vendor..."
-  New-Item -ItemType Directory -Force -Path $vendor | Out-Null
-  git clone --depth 1 https://github.com/bhadraagada/winmole.git $vendor
-  if (-not (Test-Path $script)) {
-    throw "WinMole vendor setup failed."
-  }
-
-  $khineSource = Join-Path $ProjectRoot "scripts\windows\khine"
-  if (Test-Path $khineSource) {
-    $khineDest = Join-Path $vendor "bin\khine"
-    New-Item -ItemType Directory -Force -Path $khineDest | Out-Null
-    Copy-Item -Path (Join-Path $khineSource "*.ps1") -Destination $khineDest -Force
-  }
-}
 
 function Remove-StaleBuildPath {
   $buildPath = Join-Path $ProjectRoot "build"
@@ -72,6 +58,35 @@ function Find-InnoSetupCompiler {
   return $null
 }
 
+function Ensure-InnoSetupCompiler {
+  $iscc = Find-InnoSetupCompiler
+  if ($iscc) {
+    return $iscc
+  }
+
+  if (Get-Command choco -ErrorAction SilentlyContinue) {
+    Write-Host "Inno Setup not found. Installing via Chocolatey..."
+    & choco install innosetup -y --no-progress
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "Chocolatey Inno Setup install failed."
+      return $null
+    }
+    return Find-InnoSetupCompiler
+  }
+
+  if (Get-Command winget -ErrorAction SilentlyContinue) {
+    Write-Host "Inno Setup not found. Installing via winget..."
+    & winget install --id JRSoftware.InnoSetup -e --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "winget Inno Setup install failed."
+      return $null
+    }
+    return Find-InnoSetupCompiler
+  }
+
+  return $null
+}
+
 function Build-WindowsInstaller {
   param(
     [string]$SourceDir,
@@ -84,10 +99,10 @@ function Build-WindowsInstaller {
     throw "Installer script not found: $iss"
   }
 
-  $iscc = Find-InnoSetupCompiler
+  $iscc = Ensure-InnoSetupCompiler
   if (-not $iscc) {
     Write-Warning "Inno Setup was not found. Skipping setup.exe build."
-    Write-Warning "Install Inno Setup 6, then re-run this script to create the installer."
+    Write-Warning "Install Inno Setup 6, or install Chocolatey/winget and re-run this script."
     return $null
   }
 
@@ -116,9 +131,44 @@ function Build-WindowsInstaller {
   return $setupPath
 }
 
+function Test-ReleaseBundle {
+  param([string]$ReleaseDir)
+
+  $required = @(
+    (Join-Path $ReleaseDir "$AppName.exe"),
+    (Join-Path $ReleaseDir "winmole\winmole.ps1"),
+    (Join-Path $ReleaseDir "winmole\bin\clean.ps1"),
+    (Join-Path $ReleaseDir "winmole\bin\optimize.ps1"),
+    (Join-Path $ReleaseDir "winmole\bin\analyze.exe"),
+    (Join-Path $ReleaseDir "winmole\bin\status.exe"),
+    (Join-Path $ReleaseDir "winmole\bin\khine\clean_run.ps1"),
+    (Join-Path $ReleaseDir "winmole\bin\khine\analyze_json.ps1"),
+    (Join-Path $ReleaseDir "winmole\bin\khine\status_json.ps1"),
+    (Join-Path $ReleaseDir "winmole\bin\khine\uninstall_list.ps1"),
+    (Join-Path $ReleaseDir "INSTALL.txt")
+  )
+
+  $missing = @()
+  foreach ($path in $required) {
+    if (-not (Test-Path $path)) {
+      $missing += $path
+    }
+  }
+
+  if ($missing.Count -gt 0) {
+    throw ("Release bundle verification failed. Missing:`n  " + ($missing -join "`n  "))
+  }
+
+  Write-Host "Release bundle verification passed."
+}
+
 Write-Host "Preparing release $AppName $Version..."
+Write-Host "This script fetches WinMole, builds Khine, and packages everything."
+Write-Host "No manual vendor setup or environment variables are required."
+Write-Host ""
+
 Remove-StaleBuildPath
-Ensure-WinMoleVendor
+& (Join-Path $ProjectRoot "scripts\setup_winmole_vendor.ps1") -ProjectRoot $ProjectRoot
 
 if (Get-Command python -ErrorAction SilentlyContinue) {
   python (Join-Path $ProjectRoot "scripts\generate_app_icons.py")
@@ -142,6 +192,13 @@ if (-not (Test-Path $WinMoleScript)) {
   throw "Bundled WinMole not found at: $WinMoleScript"
 }
 
+Copy-Item `
+  (Join-Path $ProjectRoot "scripts\windows\INSTALL.txt") `
+  (Join-Path $ReleaseDir "INSTALL.txt") `
+  -Force
+
+Test-ReleaseBundle -ReleaseDir $ReleaseDir
+
 $DistDir = Join-Path $ProjectRoot "dist\windows"
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 
@@ -159,8 +216,6 @@ robocopy $ReleaseDir $StageApp /E /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) {
   throw "Failed to copy release files (robocopy exit $LASTEXITCODE)."
 }
-
-Copy-Item (Join-Path $ProjectRoot "scripts\windows\INSTALL.txt") (Join-Path $StageApp "INSTALL.txt") -Force
 
 $ZipName = "$AppName-$Version-windows.zip"
 $ZipPath = Join-Path $DistDir $ZipName
@@ -180,12 +235,11 @@ if ($SetupPath) {
 }
 Write-Host "  Zip:        $ZipPath"
 Write-Host ""
+Write-Host "Share with other Windows users — they do not need Flutter, Git, or WinMole."
 if ($SetupPath) {
-  Write-Host "Share the setup.exe with other Windows users."
-  Write-Host "Double-click it to install Khine to Program Files."
+  Write-Host "  Recommended: double-click $AppName-$Version-windows-setup.exe"
 }
 else {
-  Write-Host "Share the zip with other Windows users."
-  Write-Host "They should extract it and run $AppName.exe."
+  Write-Host "  Portable: extract $ZipName and run $AppName.exe"
 }
-Write-Host "Bundled WinMole is included - no separate install required."
+Write-Host "WinMole is bundled inside the app. No separate install required."

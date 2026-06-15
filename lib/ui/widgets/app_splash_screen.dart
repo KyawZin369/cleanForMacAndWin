@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:mole_ui/core/platform/platform_info.dart';
 import 'package:mole_ui/ui/widgets/app_logo.dart';
 
 /// Animated launch splash with the Khine logo.
@@ -214,10 +215,10 @@ class _AppSplashScreenState extends State<AppSplashScreen>
                         opacity: textOpacity,
                         child: Transform.translate(
                           offset: Offset(0, textSlide),
-                          child: const Column(
+                          child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
+                              const Text(
                                 'Khine',
                                 style: TextStyle(
                                   fontSize: 32,
@@ -226,10 +227,12 @@ class _AppSplashScreenState extends State<AppSplashScreen>
                                   color: Color(0xFF1C1C1E),
                                 ),
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
-                                'macOS system toolkit',
-                                style: TextStyle(
+                                isWindows
+                                    ? 'Windows system toolkit'
+                                    : 'macOS system toolkit',
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                   letterSpacing: -0.1,

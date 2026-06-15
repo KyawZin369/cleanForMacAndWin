@@ -55,5 +55,6 @@ vendor/Mole/bin/status-go
 vendor/Mole/bin/analyze-darwin-*
 vendor/Mole/bin/status-darwin-*
 
-# WinMole is vendored without nested .git
+# Vendored CLIs are copied without nested .git
+vendor/Mole/.git/
 vendor/WinMole/.git/

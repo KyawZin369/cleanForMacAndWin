@@ -41,6 +41,7 @@ sync_khine_scripts() {
 }
 
 if [ -f "$DEST/winmole.ps1" ]; then
+  sh "$(dirname "$0")/strip_vendor_git.sh" "$DEST"
   sync_khine_scripts
   apply_khine_patches
   echo "WinMole already present at $DEST"
@@ -54,6 +55,7 @@ if command -v git >/dev/null 2>&1; then
   git clone --depth 1 https://github.com/bhadraagada/winmole.git "$DEST.tmp"
   rm -rf "$DEST"
   mv "$DEST.tmp" "$DEST"
+  sh "$(dirname "$0")/strip_vendor_git.sh" "$DEST"
 else
   curl -L -o "$ROOT/vendor/winmole.zip" \
     https://github.com/bhadraagada/winmole/archive/refs/heads/master.zip
