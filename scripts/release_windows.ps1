@@ -1,4 +1,4 @@
-# Builds Khine Windows release artifacts (one command — no manual setup):
+# Builds Khine Windows release artifacts (one command - no manual setup):
 #   - Khine-<version>-windows-setup.exe  (recommended installer)
 #   - Khine-<version>-windows.zip        (portable)
 #
@@ -9,7 +9,7 @@
 #   - Python 3 (optional, for icon generation)
 #   - Inno Setup 6 (optional; auto-installed via Chocolatey when available)
 #
-# End users only need to run the setup.exe or extract the zip — WinMole is bundled.
+# End users only need to run the setup.exe or extract the zip - WinMole is bundled.
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path,
   [switch]$SkipInstaller
@@ -235,7 +235,7 @@ if ($SetupPath) {
 }
 Write-Host "  Zip:        $ZipPath"
 Write-Host ""
-Write-Host "Share with other Windows users — they do not need Flutter, Git, or WinMole."
+Write-Host "Share with other Windows users - they do not need Flutter, Git, or WinMole."
 if ($SetupPath) {
   Write-Host "  Recommended: double-click $AppName-$Version-windows-setup.exe"
 }

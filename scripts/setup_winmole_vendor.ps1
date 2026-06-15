@@ -1,5 +1,5 @@
 # Fetches WinMole, applies Khine patches, and syncs GUI adapters.
-# Safe to run repeatedly — used by release_windows.ps1 and run_windows.ps1.
+# Safe to run repeatedly - used by release_windows.ps1 and run_windows.ps1.
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 )

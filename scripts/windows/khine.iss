@@ -70,4 +70,4 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%nKhine includes the WinMole cleanup tools — no separate install is required.
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nKhine includes the WinMole cleanup tools - no separate install is required.
