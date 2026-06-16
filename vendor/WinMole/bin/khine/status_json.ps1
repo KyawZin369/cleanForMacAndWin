@@ -26,12 +26,12 @@ catch { }
 
 $memTotal = [long]$os.TotalVisibleMemorySize * 1024
 $memFree = [long]$os.FreePhysicalMemory * 1024
-$memUsed = [math]::Max(0, $memTotal - $memFree)
+$memUsed = [Math]::Max([int64]0, ($memTotal - $memFree))
 $memPercent = if ($memTotal -gt 0) { ($memUsed / $memTotal) * 100 } else { 0 }
 
 $pageTotal = [long]($os.TotalVirtualMemorySize - $os.TotalVisibleMemorySize) * 1024
 $pageFree = [long]($os.FreeVirtualMemory - $os.FreePhysicalMemory) * 1024
-$pageUsed = [math]::Max(0, $pageTotal - $pageFree)
+$pageUsed = [Math]::Max([int64]0, ($pageTotal - $pageFree))
 
 $boot = $os.LastBootUpTime
 $uptime = if ($boot) { Format-Uptime -Span ((Get-Date) - $boot) } else { '' }
@@ -41,7 +41,7 @@ $driveIndex = 0
 Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" | ForEach-Object {
     $total = [long]$_.Size
     $free = [long]$_.FreeSpace
-    $used = [math]::Max(0, $total - $free)
+    $used = [Math]::Max([int64]0, ($total - $free))
     $usedPercent = if ($total -gt 0) { ($used / $total) * 100 } else { 0 }
     $driveIndex++
     $disks += [ordered]@{

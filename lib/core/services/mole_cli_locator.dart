@@ -396,6 +396,19 @@ class MoleCliLocator {
         return script.path;
       }
     }
+    
+    // Fallback: check vendor directory by walking up from executable
+    final exePath = File(Platform.resolvedExecutable).parent;
+    // Try walking up the directory tree to find vendor/WinMole
+    var current = exePath;
+    for (var i = 0; i < 6; i++) {
+      final vendorScript = File('${current.path}/vendor/WinMole/$windowsScriptName');
+      if (await vendorScript.exists()) {
+        return vendorScript.path;
+      }
+      current = current.parent;
+    }
+    
     return null;
   }
 
