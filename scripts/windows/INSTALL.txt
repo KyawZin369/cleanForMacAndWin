@@ -21,8 +21,8 @@ Requirements
 
 First launch on another PC
 --------------------------
-Windows SmartScreen may warn that the publisher is unknown because this
-build is not code-signed. To run the app:
+If your build is unsigned, Windows SmartScreen may warn that the publisher
+is unknown. To run the app:
 1. Click "More info"
 2. Click "Run anyway"
 

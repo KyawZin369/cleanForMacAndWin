@@ -87,6 +87,60 @@ function Ensure-InnoSetupCompiler {
   return $null
 }
 
+function Find-SignTool {
+  $candidates = @(
+    "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64\signtool.exe",
+    "${env:ProgramFiles(x86)}\Windows Kits\10\App Certification Kit\signtool.exe"
+  )
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) { return $candidate }
+  }
+  $cmd = Get-Command signtool.exe -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  return $null
+}
+
+function Sign-FileIfConfigured {
+  param([Parameter(Mandatory)][string]$Path)
+
+  if (-not (Test-Path $Path)) { return $false }
+
+  $pfxPath = $env:KHINE_SIGN_PFX_PATH
+  $pfxPassword = $env:KHINE_SIGN_PFX_PASSWORD
+  $thumbprint = $env:KHINE_SIGN_CERT_SHA1
+  $timestampUrl = if ($env:KHINE_SIGN_TIMESTAMP_URL) {
+    $env:KHINE_SIGN_TIMESTAMP_URL
+  } else {
+    "http://timestamp.digicert.com"
+  }
+
+  if (-not $pfxPath -and -not $thumbprint) {
+    return $false
+  }
+
+  $signTool = Find-SignTool
+  if (-not $signTool) {
+    Write-Warning "Signing requested but signtool.exe was not found. Skipping signing."
+    return $false
+  }
+
+  Write-Host "Signing $Path ..."
+  $args = @("sign", "/fd", "SHA256", "/tr", $timestampUrl, "/td", "SHA256")
+  if ($pfxPath) {
+    $args += @("/f", $pfxPath)
+    if ($pfxPassword) { $args += @("/p", $pfxPassword) }
+  } elseif ($thumbprint) {
+    $args += @("/sha1", $thumbprint)
+  }
+  $args += $Path
+
+  & $signTool @args
+  if ($LASTEXITCODE -ne 0) {
+    throw "Code signing failed for $Path (exit $LASTEXITCODE)"
+  }
+  return $true
+}
+
 function Build-WindowsInstaller {
   param(
     [string]$SourceDir,
@@ -199,12 +253,17 @@ Copy-Item `
 
 Test-ReleaseBundle -ReleaseDir $ReleaseDir
 
+$signedApp = Sign-FileIfConfigured -Path $ExePath
+
 $DistDir = Join-Path $ProjectRoot "dist\windows"
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 
 $SetupPath = $null
 if (-not $SkipInstaller) {
   $SetupPath = Build-WindowsInstaller -SourceDir $ReleaseDir -DistDir $DistDir -AppVersion $Version
+  if ($SetupPath) {
+    [void](Sign-FileIfConfigured -Path $SetupPath)
+  }
 }
 
 $StageRoot = Join-Path $env:TEMP ("khine-win-{0}" -f [guid]::NewGuid().ToString("N"))
@@ -243,3 +302,7 @@ else {
   Write-Host "  Portable: extract $ZipName and run $AppName.exe"
 }
 Write-Host "WinMole is bundled inside the app. No separate install required."
+if (-not $signedApp) {
+  Write-Warning "This build is unsigned. Windows SmartScreen may show 'Windows protected your PC'."
+  Write-Warning "To remove trust warnings, sign releases with a trusted code-signing certificate."
+}
