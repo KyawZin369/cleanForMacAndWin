@@ -101,9 +101,10 @@ function Find-SignTool {
 }
 
 function Sign-FileIfConfigured {
-  param([Parameter(Mandatory)][string]$Path)
+  param([Parameter(Mandatory)][string]$FilePath)
 
-  if (-not (Test-Path $Path)) { return $false }
+  if ([string]::IsNullOrWhiteSpace($FilePath)) { return $false }
+  if (-not (Test-Path -LiteralPath $FilePath)) { return $false }
 
   $pfxPath = $env:KHINE_SIGN_PFX_PATH
   $pfxPassword = $env:KHINE_SIGN_PFX_PASSWORD
@@ -124,7 +125,7 @@ function Sign-FileIfConfigured {
     return $false
   }
 
-  Write-Host "Signing $Path ..."
+  Write-Host "Signing $FilePath ..."
   $args = @("sign", "/fd", "SHA256", "/tr", $timestampUrl, "/td", "SHA256")
   if ($pfxPath) {
     $args += @("/f", $pfxPath)
@@ -132,11 +133,11 @@ function Sign-FileIfConfigured {
   } elseif ($thumbprint) {
     $args += @("/sha1", $thumbprint)
   }
-  $args += $Path
+  $args += $FilePath
 
   & $signTool @args
   if ($LASTEXITCODE -ne 0) {
-    throw "Code signing failed for $Path (exit $LASTEXITCODE)"
+    throw "Code signing failed for $FilePath (exit $LASTEXITCODE)"
   }
   return $true
 }
@@ -171,7 +172,7 @@ function Build-WindowsInstaller {
     "/DSourceDir=$SourceDir" `
     "/DOutputDir=$DistDir" `
     "/DIconFile=$iconFile" `
-    $iss
+    $iss | Out-Null
 
   if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compiler failed with exit code $LASTEXITCODE"
@@ -253,7 +254,7 @@ Copy-Item `
 
 Test-ReleaseBundle -ReleaseDir $ReleaseDir
 
-$signedApp = Sign-FileIfConfigured -Path $ExePath
+$signedApp = Sign-FileIfConfigured -FilePath $ExePath
 
 $DistDir = Join-Path $ProjectRoot "dist\windows"
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
@@ -261,8 +262,8 @@ New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
 $SetupPath = $null
 if (-not $SkipInstaller) {
   $SetupPath = Build-WindowsInstaller -SourceDir $ReleaseDir -DistDir $DistDir -AppVersion $Version
-  if ($SetupPath) {
-    [void](Sign-FileIfConfigured -Path $SetupPath)
+  if (-not [string]::IsNullOrWhiteSpace($SetupPath)) {
+    [void](Sign-FileIfConfigured -FilePath $SetupPath)
   }
 }
 
