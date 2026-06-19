@@ -30,6 +30,7 @@ class CleanController extends ChangeNotifier {
   String? _resultMessage;
   PasswordPromptState? _passwordPrompt;
   Timer? _progressTimer;
+  final List<String> _streamedErrors = [];
 
   bool get isCleaning => _isCleaning;
   double get progress => _progress;
@@ -57,6 +58,7 @@ class CleanController extends ChangeNotifier {
 
     _errorMessage = null;
     _resultMessage = null;
+    _streamedErrors.clear();
     _activityParser.reset();
     notifyListeners();
 
@@ -90,7 +92,7 @@ class CleanController extends ChangeNotifier {
       } else {
         _progress = 0;
         _resultMessage = null;
-        _errorMessage = result.errorMessage;
+        _errorMessage = _resolveCleanErrorMessage(result);
       }
     } on MoleCliNotFoundException catch (error) {
       _stopIndeterminateProgress();
@@ -173,7 +175,35 @@ class CleanController extends ChangeNotifier {
       _progress = _activityParser.progress;
     }
 
+    final errorLine = _extractStreamedError(line);
+    if (errorLine != null) {
+      _streamedErrors.add(errorLine);
+    }
+
     notifyListeners();
+  }
+
+  String? _extractStreamedError(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return null;
+
+    final lower = trimmed.toLowerCase();
+    if (RegExp(r'^x\s+', caseSensitive: false).hasMatch(trimmed)) {
+      return trimmed.replaceFirst(RegExp(r'^x\s+', caseSensitive: false), '').trim();
+    }
+    if (lower.contains('propertynotfoundexception') ||
+        lower.contains('cannot be found on this object') ||
+        lower.contains(' failed: ')) {
+      return trimmed;
+    }
+    return null;
+  }
+
+  String? _resolveCleanErrorMessage(CleanCommandResult result) {
+    if (_streamedErrors.isNotEmpty) {
+      return _streamedErrors.join('\n');
+    }
+    return result.errorMessage;
   }
 
   void _startIndeterminateProgress() {

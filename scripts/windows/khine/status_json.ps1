@@ -95,10 +95,14 @@ elseif ($memPercent -gt 75) { $health -= 10 }
 if ($disks.Count -gt 0 -and $disks[0].used_percent -gt 90) { $health -= 15 }
 $health = [math]::Max(0, [math]::Min(100, $health))
 
-$healthMsg = switch ($health) {
-    { $_ -ge 90 } { 'System is running smoothly' }
-    { $_ -ge 70 } { 'System is healthy with minor load' }
-    default { 'System is under pressure' }
+if ($health -ge 90) {
+    $healthMsg = 'System is running smoothly'
+}
+elseif ($health -ge 70) {
+    $healthMsg = 'System is healthy with minor load'
+}
+else {
+    $healthMsg = 'System is under pressure'
 }
 
 Write-KhineJson -Payload ([ordered]@{

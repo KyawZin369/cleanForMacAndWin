@@ -323,10 +323,11 @@ function Invoke-UserCleanup {
         [switch]$IncludeRecycleBin
     )
     
+    Clear-UserTempFiles -DaysOld $TempDaysOld
+    
     Start-Section "User essentials"
     
     # Always clean these
-    Clear-UserTempFiles -DaysOld $TempDaysOld
     Clear-RecentFiles -DaysOld 30
     Clear-ThumbnailCache
     Clear-ErrorReports -DaysOld 7

@@ -33,11 +33,19 @@ function Get-InstalledPrograms {
     )
     
     foreach ($path in $registryPaths) {
-        $items = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
-                 Where-Object { $_.DisplayName } |
-                 Select-Object DisplayName, InstallLocation, Publisher
-        if ($items) {
-            $programs += $items
+        try {
+            $items = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue |
+                     Where-Object {
+                         ($_.PSObject.Properties.Name -contains 'DisplayName') -and
+                         -not [string]::IsNullOrWhiteSpace([string]$_.DisplayName)
+                     } |
+                     Select-Object DisplayName, InstallLocation, Publisher
+            if ($items) {
+                $programs += $items
+            }
+        }
+        catch {
+            Write-Debug "Could not read installed programs from ${path}: $_"
         }
     }
     
@@ -64,7 +72,14 @@ function Find-OrphanedAppData {
     param([int]$DaysOld = 60)
     
     $installedPrograms = Get-InstalledPrograms
-    $installedNames = $installedPrograms | ForEach-Object { $_.DisplayName.ToLower() }
+    $installedNames = @(
+        $installedPrograms |
+            Where-Object {
+                ($_.PSObject.Properties.Name -contains 'DisplayName') -and
+                -not [string]::IsNullOrWhiteSpace([string]$_.DisplayName)
+            } |
+            ForEach-Object { $_.DisplayName.ToLower() }
+    )
     
     $orphanedPaths = @()
     $cutoffDate = (Get-Date).AddDays(-$DaysOld)
@@ -77,6 +92,8 @@ function Find-OrphanedAppData {
     
     foreach ($location in $appDataPaths) {
         if (-not (Test-Path $location.Path)) { continue }
+
+        Write-Info "Scanning $($location.Type) app data for orphaned folders"
         
         $folders = Get-ChildItem -Path $location.Path -Directory -ErrorAction SilentlyContinue
         
@@ -119,7 +136,6 @@ function Find-OrphanedAppData {
                     Path = $folder.FullName
                     Name = $folder.Name
                     Type = $location.Type
-                    Size = (Get-PathSize -Path $folder.FullName)
                     LastModified = $folder.LastWriteTime
                 }
             }
@@ -138,7 +154,14 @@ function Clear-OrphanedAppData {
     
     Start-Section "Orphaned app data"
     
-    $orphaned = Find-OrphanedAppData -DaysOld $DaysOld
+    try {
+        $orphaned = Find-OrphanedAppData -DaysOld $DaysOld
+    }
+    catch {
+        Write-WinMoleError "Could not scan orphaned app data: $($_.Exception.Message)"
+        Stop-Section
+        return
+    }
     
     if ($orphaned.Count -eq 0) {
         Write-Info "No orphaned app data found"
@@ -147,7 +170,20 @@ function Clear-OrphanedAppData {
     }
     
     # Filter by size (only clean if > 10MB to avoid noise)
-    $significantOrphans = $orphaned | Where-Object { $_.Size -gt 10MB }
+    $significantOrphans = @()
+    foreach ($orphan in $orphaned) {
+        Write-Info "Checking $($orphan.Name) size"
+        $size = Get-PathSize -Path $orphan.Path
+        if ($size -gt 10MB) {
+            $significantOrphans += [PSCustomObject]@{
+                Path         = $orphan.Path
+                Name         = $orphan.Name
+                Type         = $orphan.Type
+                Size         = $size
+                LastModified = $orphan.LastModified
+            }
+        }
+    }
     
     if ($significantOrphans.Count -gt 0) {
         $totalSize = ($significantOrphans | Measure-Object -Property Size -Sum).Sum

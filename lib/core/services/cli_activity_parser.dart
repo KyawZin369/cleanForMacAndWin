@@ -360,6 +360,12 @@ class CliActivityParser {
       return;
     }
 
+    final errorLabel = _parseErrorLabel(trimmed);
+    if (errorLabel != null) {
+      _addWarningItem(errorLabel);
+      return;
+    }
+
     final spinnerLabel = _parseSpinnerLabel(trimmed);
     if (spinnerLabel != null) {
       _setActiveActivity(spinnerLabel);
@@ -434,6 +440,22 @@ class CliActivityParser {
     }
     final match = RegExp(r'^[!⚠]\s+(.+)$').firstMatch(line);
     return match?.group(1)?.trim();
+  }
+
+  String? _parseErrorLabel(String line) {
+    final prefixed = RegExp(r'^\s*x\s+(.+)$', caseSensitive: false).firstMatch(line);
+    if (prefixed != null) {
+      return prefixed.group(1)?.trim();
+    }
+
+    final lower = line.toLowerCase();
+    if (lower.contains('propertynotfoundexception') ||
+        lower.contains('cannot be found on this object') ||
+        (line.contains(' : ') && lower.contains(' at '))) {
+      return line.trim();
+    }
+
+    return null;
   }
 
   String? _parseSpinnerLabel(String line) {

@@ -1,3 +1,12 @@
+String? _optionalString(dynamic value) {
+  if (value == null) return null;
+  if (value is String) return value;
+  if (value is List) {
+    return value.map((item) => item.toString()).join(' ');
+  }
+  return value.toString();
+}
+
 class MemoryStatus {
   const MemoryStatus({
     required this.usedBytes,
@@ -261,7 +270,7 @@ class SystemStatus {
       host: json['host'] as String? ?? '',
       uptime: json['uptime'] as String? ?? '',
       healthScore: json['health_score'] as int? ?? 0,
-      healthScoreMessage: json['health_score_msg'] as String? ?? '',
+      healthScoreMessage: _optionalString(json['health_score_msg']) ?? '',
       cpuUsage: (json['cpu']?['usage'] as num?)?.toDouble() ?? 0,
       memory: MemoryStatus.fromJson(
         json['memory'] as Map<String, dynamic>? ?? {},

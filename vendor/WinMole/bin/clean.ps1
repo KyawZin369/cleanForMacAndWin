@@ -102,6 +102,29 @@ function Show-CleanMenu {
 }
 
 # ============================================================================
+# Safe Phase Execution
+# ============================================================================
+
+$script:CleanHadErrors = $false
+
+function Invoke-CleanPhase {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Label,
+        [Parameter(Mandatory)]
+        [scriptblock]$Phase
+    )
+
+    try {
+        & $Phase
+    }
+    catch {
+        $script:CleanHadErrors = $true
+        Write-WinMoleError "$Label failed: $($_.Exception.Message)"
+    }
+}
+
+# ============================================================================
 # Main
 # ============================================================================
 
@@ -222,72 +245,85 @@ function Main {
     
     # Run cleanups
     if ($cleanUser) {
-        Invoke-UserCleanup
+        Invoke-CleanPhase "User cleanup" { Invoke-UserCleanup }
     }
     
     if ($cleanBrowsers) {
-        Clear-BrowserCacheFiles
+        Invoke-CleanPhase "Browser cleanup" { Clear-BrowserCacheFiles }
     }
     
     if ($cleanApps) {
-        Clear-CommonAppCaches
-        # Extended app cleanup: productivity, creative, gaming platform caches
-        Invoke-AppCleanup
+        Invoke-CleanPhase "Application cleanup" {
+            Clear-CommonAppCaches
+            Invoke-AppCleanup
+        }
     }
     
     if ($cleanCaches) {
-        Clear-CommonAppCaches
-        Clear-StoreAppCaches
-        Clear-DotNetCaches
-        if (Test-IsAdmin) {
-            Clear-DeliveryOptimizationCache
-            Clear-FontCache
+        if (-not $cleanApps) {
+            Invoke-CleanPhase "Application caches" { Clear-CommonAppCaches }
+        }
+        Invoke-CleanPhase "System caches" {
+            Start-Section "System caches"
+            Clear-StoreAppCaches
+            Clear-DotNetCaches
+            if (Test-IsAdmin) {
+                Clear-DeliveryOptimizationCache
+                Clear-FontCache
+            }
+            Stop-Section
         }
     }
     
     if ($cleanGPUShaders) {
-        Clear-GPUShaderCaches
+        Invoke-CleanPhase "GPU shader cleanup" { Clear-GPUShaderCaches }
     }
     
     if ($cleanDev) {
-        Invoke-DevToolsCleanup
+        Invoke-CleanPhase "Developer cleanup" { Invoke-DevToolsCleanup }
     }
     
     if ($cleanSystem) {
-        if (Test-IsAdmin) {
-            Invoke-SystemCleanup -All
-        }
-        else {
-            Write-WinMoleWarning "System cleanup requires admin - skipping"
-            Write-Info "Run 'winmole clean -System' as Administrator"
+        Invoke-CleanPhase "System cleanup" {
+            if (Test-IsAdmin) {
+                Invoke-SystemCleanup -All
+            }
+            else {
+                Write-WinMoleWarning "System cleanup requires admin - skipping"
+                Write-Info "Run 'winmole clean -System' as Administrator"
+            }
         }
     }
     
     if ($cleanRecycleBin) {
-        Clear-RecycleBin
+        Invoke-CleanPhase "Recycle Bin cleanup" { Clear-RecycleBin }
     }
     
     if ($cleanWinUpdate) {
-        if (Test-IsAdmin) {
-            Clear-WindowsUpdateDownloads
-        }
-        else {
-            Write-WinMoleWarning "Windows Update cleanup requires admin - skipping"
+        Invoke-CleanPhase "Windows Update cleanup" {
+            if (Test-IsAdmin) {
+                Clear-WindowsUpdateDownloads
+            }
+            else {
+                Write-WinMoleWarning "Windows Update cleanup requires admin - skipping"
+            }
         }
     }
     
     if ($cleanGameMedia) {
-        Clear-GameMediaFiles -DaysOld 90
+        Invoke-CleanPhase "Game media cleanup" { Clear-GameMediaFiles -DaysOld 90 }
     }
     
     if ($cleanOrphaned) {
-        Clear-OrphanedAppData -DaysOld 60
+        Invoke-CleanPhase "Orphaned app cleanup" { Clear-OrphanedAppData -DaysOld 60 }
     }
     
     # Clean empty directories
-    Start-Section "Empty Directories"
-    Remove-EmptyDirectories -Path "$env:LOCALAPPDATA" -Description "Empty folders (LocalAppData)"
-    Stop-Section
+    Invoke-CleanPhase "Empty directory cleanup" {
+        Start-Section "Empty Directories"
+        Remove-EmptyDirectories -Path "$env:LOCALAPPDATA" -Description "Empty folders (LocalAppData)"
+        Stop-Section
+    }
     
     # Show final summary
     $stats = Get-CleanupStats
@@ -309,6 +345,13 @@ function Main {
 # Run
 try {
     Main
+    if ($script:CleanHadErrors) {
+        exit 1
+    }
+}
+catch {
+    Write-WinMoleError $_.Exception.Message
+    exit 1
 }
 finally {
     Clear-TempFiles
