@@ -53,6 +53,15 @@ class CleanCommandRunner {
     return _runScript('bin/khine/clean_run_admin.ps1', onOutput: onOutput);
   }
 
+  Future<CleanCommandResult> runBrowserRetryPhase({
+    required void Function(String line) onOutput,
+  }) {
+    return _runScript(
+      'bin/khine/clean_run_browsers_retry.ps1',
+      onOutput: onOutput,
+    );
+  }
+
   Future<CleanCommandResult> runRetryLockedPhase({
     required void Function(String line) onOutput,
   }) {

@@ -34,9 +34,10 @@ class CleanController extends ChangeNotifier {
   Timer? _progressTimer;
   final List<String> _streamedErrors = [];
   final List<String> _streamedWarnings = [];
-  bool _adminCleanupSkipped = false;
   bool _hasLockedFileFailures = false;
   bool _browserLockDetected = false;
+  bool _nonBrowserLockDetected = false;
+  final Set<String> _lockedBrowsers = {};
   bool _editorLockDetected = false;
 
   bool get isCleaning => _isCleaning;
@@ -69,9 +70,10 @@ class CleanController extends ChangeNotifier {
     _resultMessage = null;
     _streamedErrors.clear();
     _streamedWarnings.clear();
-    _adminCleanupSkipped = false;
     _hasLockedFileFailures = false;
     _browserLockDetected = false;
+    _nonBrowserLockDetected = false;
+    _lockedBrowsers.clear();
     _editorLockDetected = false;
     _activityParser.reset();
     notifyListeners();
@@ -96,30 +98,35 @@ class CleanController extends ChangeNotifier {
       if (!_isCleaning) return;
 
       if (isWindows) {
-        if (_adminCleanupSkipped) {
-          final runAdmin = await _requestConfirm(
-            title: 'Administrator access required',
-            message:
-                'System cleanup needs administrator permission to remove protected Windows caches.\n\n'
-                'Windows will show a UAC prompt. Click Yes on that prompt to continue as administrator.',
-            confirmLabel: 'Continue as administrator',
-            cancelLabel: 'Skip system cleanup',
+        if (_browserLockDetected) {
+          final runBrowserRetry = await _requestConfirm(
+            title: 'Close your browser',
+            message: _buildCloseBrowserMessage(),
+            confirmLabel: 'I closed my browser — retry',
+            cancelLabel: 'Skip browser cleanup',
           );
-          if (runAdmin == true) {
-            final adminResult = await _commandRunner.runAdminPhase(
+          _clearConfirmPrompt();
+          if (runBrowserRetry == true) {
+            final browserResult = await _commandRunner.runBrowserRetryPhase(
               onOutput: _handleCommandOutput,
             );
-            result = _mergeCleanResults(result, adminResult);
+            result = _mergeCleanResults(result, browserResult);
           }
         }
 
-        if (_hasLockedFileFailures) {
+        final adminResult = await _commandRunner.runAdminPhase(
+          onOutput: _handleCommandOutput,
+        );
+        result = _mergeCleanResults(result, adminResult);
+
+        if (_nonBrowserLockDetected) {
           final runRetry = await _requestConfirm(
             title: 'Close apps and retry',
             message: _buildCloseAppsMessage(),
             confirmLabel: 'I closed them — retry',
             cancelLabel: 'Skip retry',
           );
+          _clearConfirmPrompt();
           if (runRetry == true) {
             final retryResult = await _commandRunner.runRetryLockedPhase(
               onOutput: _handleCommandOutput,
@@ -244,17 +251,29 @@ class CleanController extends ChangeNotifier {
     );
   }
 
+  void _clearConfirmPrompt() {
+    _confirmPrompt = null;
+    notifyListeners();
+  }
+
+  String _buildCloseBrowserMessage() {
+    final browsers = _lockedBrowsers.toList()..sort();
+    final browserList = browsers.isEmpty
+        ? 'your browser (Chrome, Edge, Firefox, etc.)'
+        : browsers.join(', ');
+
+    return 'Some browser cache files could not be removed because $browserList is still running.\n\n'
+        'Please close all browser windows completely, then click "I closed my browser — retry" to clean browser caches again.';
+  }
+
   String _buildCloseAppsMessage() {
     final parts = <String>[];
-    if (_browserLockDetected) {
-      parts.add('all browser windows (Chrome, Edge, Firefox, etc.)');
-    }
     if (_editorLockDetected) {
       parts.add('code editors (VS Code, Cursor, etc.)');
     }
 
     final target = parts.isEmpty
-        ? 'apps that may be locking temp or cache files (browsers, editors, games)'
+        ? 'apps that may be locking temp or cache files (editors, games, GPU drivers)'
         : parts.join(' and ');
 
     return 'Some files could not be removed because they are in use.\n\n'
@@ -290,12 +309,7 @@ class CleanController extends ChangeNotifier {
 
     final lower = trimmed.toLowerCase();
     if (lower.contains('requires admin') && lower.contains('skipping')) {
-      _adminCleanupSkipped = true;
       return trimmed;
-    }
-    if (lower.contains('run ''winmole clean -system'' as administrator') ||
-        lower.contains('run as administrator')) {
-      _adminCleanupSkipped = true;
     }
     if (lower.contains('could not be removed') ||
         lower.contains('more item(s) could not be removed') ||
@@ -315,14 +329,36 @@ class CleanController extends ChangeNotifier {
   }
 
   void _trackLockedFileContext(String lower) {
-    if (lower.contains('chrome') ||
+    final isBrowserLock = lower.contains('chrome') ||
         lower.contains('edge') ||
         lower.contains('firefox') ||
+        lower.contains('brave') ||
+        lower.contains('opera') ||
         lower.contains('browser') ||
         lower.contains('no_vary_search') ||
-        lower.contains('code cache')) {
+        lower.contains('code cache');
+
+    if (isBrowserLock) {
       _browserLockDetected = true;
+      if (lower.contains('edge')) {
+        _lockedBrowsers.add('Microsoft Edge');
+      }
+      if (lower.contains('chrome')) {
+        _lockedBrowsers.add('Google Chrome');
+      }
+      if (lower.contains('firefox')) {
+        _lockedBrowsers.add('Mozilla Firefox');
+      }
+      if (lower.contains('brave')) {
+        _lockedBrowsers.add('Brave');
+      }
+      if (lower.contains('opera')) {
+        _lockedBrowsers.add('Opera');
+      }
+      return;
     }
+
+    _nonBrowserLockDetected = true;
     if (lower.contains('vscode') ||
         lower.contains('vs code') ||
         lower.contains('cursor') ||

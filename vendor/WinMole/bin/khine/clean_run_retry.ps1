@@ -13,6 +13,6 @@ if (-not (Test-Path -LiteralPath $cleanScript)) {
     exit 1
 }
 
-Write-Info 'Retrying cleanup for temp files, browser caches, and GPU shader caches...'
-& $cleanScript -User -Browsers -GPUShaders
+Write-Info 'Retrying cleanup for temp files and GPU shader caches...'
+& $cleanScript -User -GPUShaders
 exit $LASTEXITCODE

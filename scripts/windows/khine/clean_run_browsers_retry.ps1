@@ -1,4 +1,4 @@
-# Khine adapter: retry cleanup for files that were locked during the first pass.
+# Khine adapter: retry browser cache cleanup after the user closes their browser.
 #Requires -Version 5.1
 
 . "$PSScriptRoot\_common.ps1"
@@ -13,6 +13,6 @@ if (-not (Test-Path -LiteralPath $cleanScript)) {
     exit 1
 }
 
-Write-Info 'Retrying cleanup for temp files and GPU shader caches...'
-& $cleanScript -User -GPUShaders
+Write-Info 'Retrying browser cache cleanup...'
+& $cleanScript -Browsers
 exit $LASTEXITCODE

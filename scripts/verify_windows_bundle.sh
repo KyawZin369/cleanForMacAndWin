@@ -34,7 +34,7 @@ check "$VENDOR/lib/core/common.ps1"
 
 echo ""
 echo "Checking Khine Windows adapters..."
-for script in _common.ps1 analyze_json.ps1 status_json.ps1 clean_run.ps1 uninstall_list.ps1 uninstall_apps.ps1 uninstall_lib.ps1; do
+for script in _common.ps1 analyze_json.ps1 status_json.ps1 clean_run.ps1 clean_run_admin.ps1 clean_run_retry.ps1 clean_run_browsers_retry.ps1 uninstall_list.ps1 uninstall_apps.ps1 uninstall_lib.ps1; do
   check "$KHINE/$script"
   check "$VENDOR/bin/khine/$script"
 done

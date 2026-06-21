@@ -13,5 +13,6 @@ if (-not (Test-Path -LiteralPath $cleanScript)) {
     exit 1
 }
 
-& $cleanScript -All
+# User-level cleanup first. Protected system tasks run later via clean_run_admin.ps1 (UAC).
+& $cleanScript -User -Browsers -Apps -Caches -GPUShaders -Dev -GameMedia -Orphaned
 exit $LASTEXITCODE
