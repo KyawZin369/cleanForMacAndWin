@@ -54,3 +54,68 @@ function Get-DirectorySizeBytes {
         return 0
     }
 }
+
+function Invoke-KhineElevatedScript {
+    <#
+    .SYNOPSIS
+        Re-runs a Khine adapter script with UAC elevation and replays its log output.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$ScriptPath,
+
+        [string[]]$ScriptArguments = @()
+    )
+
+    if (Test-IsAdmin) {
+        & $ScriptPath @ScriptArguments
+        return $LASTEXITCODE
+    }
+
+    $logFile = Join-Path $env:TEMP ("khine-elev-{0}.log" -f [Guid]::NewGuid().ToString('n'))
+    $argList = @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', $ScriptPath,
+        '-KhineElevatedChild',
+        '-KhineLogFile', $logFile
+    ) + $ScriptArguments
+
+    Write-Info 'Requesting administrator approval (UAC)...'
+    $proc = Start-Process -FilePath 'powershell.exe' -ArgumentList $argList -Verb RunAs -Wait -PassThru
+    if (Test-Path -LiteralPath $logFile) {
+        Get-Content -LiteralPath $logFile -ErrorAction SilentlyContinue | ForEach-Object { Write-Output $_ }
+        Remove-Item -LiteralPath $logFile -Force -ErrorAction SilentlyContinue
+    }
+
+    if ($null -eq $proc) {
+        Write-WinMoleWarning 'Administrator approval was cancelled.'
+        return 1
+    }
+
+    return [int]$proc.ExitCode
+}
+
+function Start-KhineScriptLogging {
+    param([string]$LogFile)
+
+    if ([string]::IsNullOrWhiteSpace($LogFile)) {
+        return
+    }
+
+    $logDir = Split-Path -Parent $LogFile
+    if ($logDir -and -not (Test-Path -LiteralPath $logDir)) {
+        New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    }
+
+    Start-Transcript -LiteralPath $LogFile -Force | Out-Null
+}
+
+function Stop-KhineScriptLogging {
+    try {
+        Stop-Transcript | Out-Null
+    }
+    catch {
+        # Transcript may not have started.
+    }
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mole_ui/core/logic/clean_controller.dart';
 import 'package:mole_ui/ui/widgets/activity_progress_panel.dart';
+import 'package:mole_ui/ui/windows/widgets/clean_confirm_listener.dart';
 import 'package:mole_ui/ui/windows/widgets/fluent_widgets.dart';
 import 'package:mole_ui/ui/windows/widgets/windows_spinner.dart';
 
@@ -11,50 +12,55 @@ class WindowsCleanTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final isCleaning = controller.isCleaning;
+    return CleanConfirmListener(
+      listenable: controller,
+      readPrompt: () => controller.confirmPrompt,
+      child: AnimatedBuilder(
+        animation: controller,
+        builder: (context, _) {
+          final isCleaning = controller.isCleaning;
 
-        if (isCleaning) {
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    WindowsSpinner(
-                      isAnimating: true,
-                      progress: controller.progress,
-                      size: 64,
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Cleaning your PC',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF323130),
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Removing junk safely, step by step',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF605E5C),
-                            ),
-                          ),
-                        ],
+          if (isCleaning) {
+            return Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      WindowsSpinner(
+                        isAnimating: true,
+                        progress: controller.progress,
+                        size: 64,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Cleaning your PC',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF323130),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              controller.confirmPrompt != null
+                                  ? 'Waiting for your confirmation...'
+                                  : 'Removing junk safely, step by step',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF605E5C),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 const SizedBox(height: 20),
                 Expanded(
                   child: SingleChildScrollView(
@@ -124,6 +130,7 @@ class WindowsCleanTab extends StatelessWidget {
           ),
         );
       },
+      ),
     );
   }
 }

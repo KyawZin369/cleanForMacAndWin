@@ -39,10 +39,34 @@ class CleanCommandRunner {
   Future<CleanCommandResult> run({
     required void Function(String line) onOutput,
     MolePasswordPromptCallback? onPasswordPrompt,
+  }) {
+    return _runScript(
+      'bin/khine/clean_run.ps1',
+      onOutput: onOutput,
+      onPasswordPrompt: onPasswordPrompt,
+    );
+  }
+
+  Future<CleanCommandResult> runAdminPhase({
+    required void Function(String line) onOutput,
+  }) {
+    return _runScript('bin/khine/clean_run_admin.ps1', onOutput: onOutput);
+  }
+
+  Future<CleanCommandResult> runRetryLockedPhase({
+    required void Function(String line) onOutput,
+  }) {
+    return _runScript('bin/khine/clean_run_retry.ps1', onOutput: onOutput);
+  }
+
+  Future<CleanCommandResult> _runScript(
+    String scriptRelative, {
+    required void Function(String line) onOutput,
+    MolePasswordPromptCallback? onPasswordPrompt,
   }) async {
     final result = isWindows
         ? await _cli.runKhineScriptStreaming(
-            'bin/khine/clean_run.ps1',
+            scriptRelative,
             const [],
             onOutput: onOutput,
             onPasswordPrompt: onPasswordPrompt,

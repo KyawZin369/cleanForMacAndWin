@@ -413,6 +413,10 @@ class CliActivityParser {
     if (line.startsWith('System  ')) return true;
     if (line.contains('Run System File Checker')) return true;
     if (line.contains('Requires administrator')) return true;
+    if (RegExp(r'^Name\s+Value\b').hasMatch(line)) return true;
+    if (RegExp(r'^-+\s*$').hasMatch(line)) return true;
+    if (RegExp(r'^(Size|Removed|Failed)\s+\d').hasMatch(line)) return true;
+    if (line == 'True' || line == 'False') return true;
     return false;
   }
 
@@ -438,7 +442,13 @@ class CliActivityParser {
     if (line.contains('Whitelist:')) {
       return line.replaceFirst(RegExp(r'^.*Whitelist:\s*'), 'Whitelist: ').trim();
     }
-    final match = RegExp(r'^[!⚠]\s+(.+)$').firstMatch(line);
+    final lower = line.toLowerCase();
+    if (lower.contains('could not be removed') ||
+        lower.contains('requires admin') ||
+        lower.contains('run ''winmole clean')) {
+      return line.replaceFirst(RegExp(r'^[!?●⚠]\s+', unicode: true), '').trim();
+    }
+    final match = RegExp(r'^[!?●⚠]\s+(.+)$', unicode: true).firstMatch(line);
     return match?.group(1)?.trim();
   }
 

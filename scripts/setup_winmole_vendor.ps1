@@ -84,6 +84,13 @@ function Apply-KhinePatches {
     Set-Content -LiteralPath $clean -Value $cleanContent -NoNewline
     Write-Host "Patched clean.ps1 for Khine compatibility"
   }
+
+  $fileOpsPatch = Join-Path $ProjectRoot "scripts\windows\patches\file_ops.ps1"
+  $fileOpsDest = Join-Path $Dest "lib\core\file_ops.ps1"
+  if ((Test-Path $fileOpsPatch) -and (Test-Path (Split-Path $fileOpsDest -Parent))) {
+    Copy-Item -LiteralPath $fileOpsPatch -Destination $fileOpsDest -Force
+    Write-Host "Applied Khine file_ops.ps1 patch"
+  }
 }
 
 if (Test-Path (Join-Path $Dest "winmole.ps1")) {

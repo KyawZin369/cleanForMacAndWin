@@ -12,6 +12,10 @@ String stripAnsiEscapes(String text) {
   return text.replaceAll(_ansiEscapePattern, '');
 }
 
+/// Windows PowerShell writes redirected stdout using the active code page, not
+/// UTF-8. Using [systemEncoding] there avoids [FormatException] on icons/ANSI.
+Encoding get _cliProcessEncoding => isWindows ? io.systemEncoding : utf8;
+
 class MoleCliResult {
   const MoleCliResult({
     required this.exitCode,
@@ -82,8 +86,8 @@ class MoleCliRunner {
       launch.args,
       environment: launch.environment,
       workingDirectory: launch.workingDirectory,
-      stdoutEncoding: utf8,
-      stderrEncoding: utf8,
+      stdoutEncoding: _cliProcessEncoding,
+      stderrEncoding: _cliProcessEncoding,
       runInShell: launch.runInShell,
     );
 
@@ -263,12 +267,12 @@ class MoleCliRunner {
     }
 
     final stdoutSub = process.stdout
-        .transform(utf8.decoder)
+        .transform(_cliProcessEncoding.decoder)
         .transform(const LineSplitter())
         .listen((line) => handleLine(line, stdoutBuffer, isStderr: false));
 
     final stderrSub = process.stderr
-        .transform(utf8.decoder)
+        .transform(_cliProcessEncoding.decoder)
         .transform(const LineSplitter())
         .listen((line) => handleLine(line, stderrBuffer, isStderr: true));
 

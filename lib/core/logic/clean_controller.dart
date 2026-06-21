@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:mole_ui/core/logic/clean_confirm_prompt_state.dart';
 import 'package:mole_ui/core/logic/cli_activity.dart';
 import 'package:mole_ui/core/logic/password_prompt_state.dart';
 import 'package:mole_ui/core/platform/platform_info.dart';
@@ -29,8 +30,14 @@ class CleanController extends ChangeNotifier {
   String? _errorMessage;
   String? _resultMessage;
   PasswordPromptState? _passwordPrompt;
+  CleanConfirmPromptState? _confirmPrompt;
   Timer? _progressTimer;
   final List<String> _streamedErrors = [];
+  final List<String> _streamedWarnings = [];
+  bool _adminCleanupSkipped = false;
+  bool _hasLockedFileFailures = false;
+  bool _browserLockDetected = false;
+  bool _editorLockDetected = false;
 
   bool get isCleaning => _isCleaning;
   double get progress => _progress;
@@ -38,8 +45,10 @@ class CleanController extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get resultMessage => _resultMessage;
   PasswordPromptState? get passwordPrompt => _passwordPrompt;
+  CleanConfirmPromptState? get confirmPrompt => _confirmPrompt;
   List<ActivitySection> get activitySections => _activityParser.sections;
   String? get currentActivityLabel => _activityParser.currentActivityLabel;
+  List<String> get cleanWarnings => List.unmodifiable(_streamedWarnings);
 
   String get cleanCommandLabel => switch (currentPlatform) {
         AppPlatform.mac => 'mo clean',
@@ -59,6 +68,11 @@ class CleanController extends ChangeNotifier {
     _errorMessage = null;
     _resultMessage = null;
     _streamedErrors.clear();
+    _streamedWarnings.clear();
+    _adminCleanupSkipped = false;
+    _hasLockedFileFailures = false;
+    _browserLockDetected = false;
+    _editorLockDetected = false;
     _activityParser.reset();
     notifyListeners();
 
@@ -74,21 +88,56 @@ class CleanController extends ChangeNotifier {
     _startIndeterminateProgress();
 
     try {
-      final result = await _commandRunner.run(
+      var result = await _commandRunner.run(
         onOutput: _handleCommandOutput,
         onPasswordPrompt: _requestPassword,
       );
+
+      if (!_isCleaning) return;
+
+      if (isWindows) {
+        if (_adminCleanupSkipped) {
+          final runAdmin = await _requestConfirm(
+            title: 'Administrator access required',
+            message:
+                'System cleanup needs administrator permission to remove protected Windows caches.\n\n'
+                'Windows will show a UAC prompt. Click Yes on that prompt to continue as administrator.',
+            confirmLabel: 'Continue as administrator',
+            cancelLabel: 'Skip system cleanup',
+          );
+          if (runAdmin == true) {
+            final adminResult = await _commandRunner.runAdminPhase(
+              onOutput: _handleCommandOutput,
+            );
+            result = _mergeCleanResults(result, adminResult);
+          }
+        }
+
+        if (_hasLockedFileFailures) {
+          final runRetry = await _requestConfirm(
+            title: 'Close apps and retry',
+            message: _buildCloseAppsMessage(),
+            confirmLabel: 'I closed them — retry',
+            cancelLabel: 'Skip retry',
+          );
+          if (runRetry == true) {
+            final retryResult = await _commandRunner.runRetryLockedPhase(
+              onOutput: _handleCommandOutput,
+            );
+            result = _mergeCleanResults(result, retryResult);
+          }
+        }
+      }
 
       _stopIndeterminateProgress();
       _activityParser.finish();
 
       if (!_isCleaning) return;
 
-      if (result.success) {
+      if (result.success || _isPartialCleanSuccess(result)) {
         _progress = 1.0;
         _errorMessage = null;
-        _resultMessage =
-            result.resultMessage ?? 'Cleanup complete.';
+        _resultMessage = _buildCleanResultMessage(result);
       } else {
         _progress = 0;
         _resultMessage = null;
@@ -109,6 +158,7 @@ class CleanController extends ChangeNotifier {
     } finally {
       _isCleaning = false;
       _passwordPrompt = null;
+      _confirmPrompt = null;
       notifyListeners();
     }
   }
@@ -165,6 +215,52 @@ class CleanController extends ChangeNotifier {
     return completer.future;
   }
 
+  Future<bool?> _requestConfirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    required String cancelLabel,
+  }) {
+    final completer = Completer<bool?>();
+    _confirmPrompt = CleanConfirmPromptState(
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      cancelLabel: cancelLabel,
+      completer: completer,
+    );
+    notifyListeners();
+    return completer.future;
+  }
+
+  CleanCommandResult _mergeCleanResults(
+    CleanCommandResult first,
+    CleanCommandResult second,
+  ) {
+    return CleanCommandResult(
+      exitCode: first.success && second.success ? 0 : 1,
+      stdout: '${first.stdout}\n${second.stdout}',
+      stderr: '${first.stderr}\n${second.stderr}',
+    );
+  }
+
+  String _buildCloseAppsMessage() {
+    final parts = <String>[];
+    if (_browserLockDetected) {
+      parts.add('all browser windows (Chrome, Edge, Firefox, etc.)');
+    }
+    if (_editorLockDetected) {
+      parts.add('code editors (VS Code, Cursor, etc.)');
+    }
+
+    final target = parts.isEmpty
+        ? 'apps that may be locking temp or cache files (browsers, editors, games)'
+        : parts.join(' and ');
+
+    return 'Some files could not be removed because they are in use.\n\n'
+        'Please close $target, then click "I closed them — retry" to clean those files again.';
+  }
+
   void _handleCommandOutput(String line) {
     _activityParser.handleLine(line);
 
@@ -180,7 +276,90 @@ class CleanController extends ChangeNotifier {
       _streamedErrors.add(errorLine);
     }
 
+    final warningLine = _extractStreamedWarning(line);
+    if (warningLine != null && !_streamedWarnings.contains(warningLine)) {
+      _streamedWarnings.add(warningLine);
+    }
+
     notifyListeners();
+  }
+
+  String? _extractStreamedWarning(String line) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty) return null;
+
+    final lower = trimmed.toLowerCase();
+    if (lower.contains('requires admin') && lower.contains('skipping')) {
+      _adminCleanupSkipped = true;
+      return trimmed;
+    }
+    if (lower.contains('run ''winmole clean -system'' as administrator') ||
+        lower.contains('run as administrator')) {
+      _adminCleanupSkipped = true;
+    }
+    if (lower.contains('could not be removed') ||
+        lower.contains('more item(s) could not be removed') ||
+        lower.contains('in use by another program') ||
+        lower.contains('access to the path is denied')) {
+      _hasLockedFileFailures = true;
+      _trackLockedFileContext(lower);
+      return trimmed;
+    }
+
+    if (RegExp(r'^[!?●⚠]\s+', unicode: true).hasMatch(trimmed) &&
+        !lower.contains('nothing to tidy')) {
+      return trimmed.replaceFirst(RegExp(r'^[!?●⚠]\s+', unicode: true), '').trim();
+    }
+
+    return null;
+  }
+
+  void _trackLockedFileContext(String lower) {
+    if (lower.contains('chrome') ||
+        lower.contains('edge') ||
+        lower.contains('firefox') ||
+        lower.contains('browser') ||
+        lower.contains('no_vary_search') ||
+        lower.contains('code cache')) {
+      _browserLockDetected = true;
+    }
+    if (lower.contains('vscode') ||
+        lower.contains('vs code') ||
+        lower.contains('cursor') ||
+        lower.contains('.tmp') ||
+        lower.contains('temp files')) {
+      _editorLockDetected = true;
+    }
+    if (lower.contains('shader') ||
+        lower.contains('nvidia') ||
+        lower.contains('amd') ||
+        lower.contains('.parc')) {
+      _editorLockDetected = true;
+    }
+  }
+
+  bool _isPartialCleanSuccess(CleanCommandResult result) {
+    if (isWindows && result.exitCode == 1 && _activityParser.sections.isNotEmpty) {
+      return true;
+    }
+    return _activityParser.sections.any(
+      (section) =>
+          section.status == ActivitySectionStatus.completed &&
+          section.completedItemCount > 0,
+    );
+  }
+
+  String _buildCleanResultMessage(CleanCommandResult result) {
+    final base = result.resultMessage ?? 'Cleanup complete.';
+    if (_streamedWarnings.isEmpty) {
+      return base;
+    }
+
+    final warnings = _streamedWarnings.take(5).join('\n');
+    final extra = _streamedWarnings.length > 5
+        ? '\n...and ${_streamedWarnings.length - 5} more warnings.'
+        : '';
+    return '$base\n\nSome items could not be removed:\n$warnings$extra';
   }
 
   String? _extractStreamedError(String line) {
